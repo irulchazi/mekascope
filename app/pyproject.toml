@@ -1,0 +1,28 @@
+[project]
+name = "mekascope-backend"
+version = "0.2.0"
+description = "FastAPI backend for human-reviewed bicycle diagnosis with Gemini."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.30.0,<1.0.0",
+    "sqlalchemy[asyncio]>=2.0.36,<3",
+    "psycopg[binary]>=3.2.3,<4",
+    "alembic>=1.14,<2",
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.7,<3",
+    "google-genai>=2.31,<3",
+    "python-multipart>=0.0.20,<1",
+    "pillow>=11,<13",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "pytest-asyncio>=1,<2",
+    "httpx>=0.28,<1",
+    "ruff>=0.14,<1",
+]
+
+[tool.uv]
+package = false
