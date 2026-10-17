@@ -74,7 +74,13 @@ h1, h2, h3, p { margin-top: 0; }
 .stage-button.is-active .stage-icon { color: var(--teal); border-color: #3d726e; background: #173334; }
 .stage-text { display: grid; gap: 4px; min-width: 0; }
 .stage-text b { font-size: 1.0625rem; font-weight: 700; overflow-wrap: anywhere; }
-.stage-text small { font-size: 0.875rem; color: var(--muted-2); white-space: normal; }
+.stage-button[data-tip], .factory-link[data-tip], .info-tip { position: relative; }
+.stage-button[data-tip]::after, .factory-link[data-tip]::after, .info-tip[data-tip]::after { content: attr(data-tip); position: absolute; left: 50%; top: calc(100% - 4px); transform: translate(-50%, 4px); padding: 5px 9px; border-radius: 6px; background: #0b1416; border: 1px solid #2a504d; color: var(--text); font-size: 0.8125rem; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s, transform .15s; z-index: 20; }
+.stage-button[data-tip]:hover::after, .factory-link[data-tip]:hover::after, .info-tip[data-tip]:hover::after, .info-tip[data-tip]:focus::after { opacity: 1; transform: translate(-50%, 0); }
+.info-tip { display: inline-flex; color: var(--muted-2); cursor: help; }
+.info-tip:hover, .info-tip:focus { color: var(--teal); }
+.info-tip[data-tip]::after { white-space: normal; width: max-content; max-width: 190px; left: auto; right: 0; transform: translate(0, 4px); }
+.info-tip[data-tip]:hover::after, .info-tip[data-tip]:focus::after { transform: translate(0, 0); }
 .stage-status { margin-left: auto; color: #587077; font: 700 0.75rem var(--mono); }
 .stage-button.is-active .stage-status, .stage-button.is-past .stage-status { color: var(--teal); }
 .sidebar-lower { margin-top: auto; padding-top: 44px; }
