@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Score = Annotated[int, Field(ge=0, le=100)]
 Text = Annotated[str, Field(min_length=1, max_length=4000)]
 Stage = Literal["observe", "understand", "investigate", "verify", "act"]
+BoardStatus = Literal["todo", "in_progress", "done"]
 
 
 class Schema(BaseModel):
@@ -17,6 +18,11 @@ class Schema(BaseModel):
 
 class Annotation(Schema):
     label: Text
+    description: str = Field(
+        default="",
+        max_length=1200,
+        description="A brief explanation of this component's function and visible details.",
+    )
     # Gemini image coordinates, independent of the original image dimensions.
     box: Annotated[
         list[Annotated[int, Field(ge=0, le=1000)]], Field(min_length=4, max_length=4)
@@ -99,9 +105,22 @@ class TaskView(Schema):
     id: int
     created_at: datetime
     status: Literal["open", "resolved"]
+    board_status: BoardStatus
     recommendation: VerificationResult
     resolved_at: datetime | None = None
     outcome_notes: str | None = None
+
+
+class MaintenanceTaskView(TaskView):
+    case_id: UUID
+    equipment: str
+    component: str | None
+    symptom: str
+
+
+class TaskStatusUpdate(Schema):
+    status: BoardStatus
+    notes: str = Field(default="", max_length=4000)
 
 
 class CaseView(Schema):

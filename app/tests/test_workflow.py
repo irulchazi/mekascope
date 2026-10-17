@@ -20,6 +20,8 @@ from app.services import now
 
 
 def photo(format="PNG"):
+    if format == "HEIF_48MP":
+        return (ROOT / "app/tests/fixtures/iphone-48mp.heic").read_bytes()
     data = io.BytesIO()
     Image.new("RGB", (80, 60), "green").save(data, format=format)
     return data.getvalue()
@@ -125,7 +127,14 @@ async def test_prerequisites_and_not_found(client, provider):
 
 @pytest.mark.parametrize(
     "format,mime",
-    [("JPEG", "image/jpeg"), ("PNG", "image/png"), ("WEBP", "image/webp")],
+    [
+        ("JPEG", "image/jpeg"),
+        ("PNG", "image/png"),
+        ("WEBP", "image/webp"),
+        ("HEIF", "image/heic"),
+        ("HEIF", "image/heif"),
+        ("HEIF_48MP", "image/heic"),
+    ],
 )
 async def test_upload_isolation(client, format, mime):
     response = await client.post(
@@ -178,7 +187,8 @@ async def test_upload_validation(client):
     assert response.status_code == 413, response.text
 
 
-async def test_evidence_photos_and_finalization(client, provider):
+@pytest.mark.parametrize("format,mime", [("PNG", "image/png"), ("HEIF", "image/heic")])
+async def test_evidence_photos_and_finalization(client, provider, format, mime):
     path, case = await investigated(client)
     assert (await client.post(path + "/verify")).status_code == 409
     assert (
@@ -188,7 +198,7 @@ async def test_evidence_photos_and_finalization(client, provider):
         response = await client.put(
             path + "/verification-steps/" + step["id"],
             data={"completed": True, "observation": "Rubbing beside the cog."},
-            files={"image": ("evidence.png", photo(), "image/png")},
+            files={"image": ("evidence", photo(format), mime)},
         )
         assert response.status_code == 200, response.text
         assert response.json()["steps"][0]["image_url"]
@@ -347,3 +357,28 @@ def test_annotation_and_recognition_validation():
             summary="Visible",
             annotations=[],
         )
+
+
+async def test_component_descriptions_persist_and_legacy_scans_load(
+    client, application, provider
+):
+    case = await new_case(client)
+    path = f"/api/v1/cases/{case['id']}"
+    description = "Guides the chain between the rear sprockets."
+    provider.results["scan"].annotations[0].description = description
+    scanned = await client.post(path + "/scan")
+    assert scanned.status_code == 200
+    assert scanned.json()["scan"]["annotations"][0]["description"] == description
+    saved = (await client.get(path)).json()["scan"]
+    assert saved["annotations"][0]["description"] == description
+
+    # Stored scans made before per-component descriptions remain readable.
+    del saved["annotations"][0]["description"]
+    async with application.state.sessions() as db:
+        await db.execute(
+            update(Case).where(Case.id == UUID(case["id"])).values(scan=saved)
+        )
+        await db.commit()
+    legacy = await client.get(path)
+    assert legacy.status_code == 200
+    assert legacy.json()["scan"]["annotations"][0]["description"] == ""

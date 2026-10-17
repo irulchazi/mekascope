@@ -20,9 +20,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog import CATALOG, SAMPLE_CONTEXT, SAMPLE_IMAGE
 from app.images import normalize_image, read_image
-from app.models import Case, Image, Outcome, ServiceTask
-from app.schemas import Approval, CaseView, Resolution
-from app.services import analyze, busy, get_case, snapshot
+from app.models import Case, Image, ServiceTask
+from app.schemas import (
+    Approval,
+    CaseView,
+    MaintenanceTaskView,
+    Resolution,
+    TaskStatusUpdate,
+)
+from app.services import (
+    analyze,
+    busy,
+    get_case,
+    maintenance_tasks,
+    snapshot,
+    transition_task,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -38,6 +51,19 @@ Db = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/catalog", tags=["catalog"])
 async def catalog() -> dict:
     return CATALOG
+
+
+@router.post("/images/preview", tags=["images"], response_class=Response)
+async def preview_image(
+    request: Request, image: Annotated[UploadFile, File()]
+) -> Response:
+    """Convert an upload to a browser-compatible photo without saving a case."""
+    mime, data = await read_image(image, request.app.state.settings)
+    return Response(
+        data,
+        media_type=mime,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.post("/cases", response_model=CaseView, status_code=201, tags=["cases"])
@@ -198,25 +224,26 @@ async def approve_task(
     return await snapshot(db, case, request.app.state.settings)
 
 
+@router.get("/tasks", response_model=list[MaintenanceTaskView], tags=["tasks"])
+async def list_maintenance_tasks(db: Db) -> list[MaintenanceTaskView]:
+    return await maintenance_tasks(db)
+
+
+@router.put(
+    "/tasks/{task_id}/status", response_model=MaintenanceTaskView, tags=["tasks"]
+)
+async def update_task_status(
+    task_id: int, update: TaskStatusUpdate, db: Db
+) -> MaintenanceTaskView:
+    await transition_task(db, task_id, update.status, update.notes)
+    return (await maintenance_tasks(db, task_id))[0]
+
+
 @router.post("/tasks/{task_id}/resolve", response_model=CaseView, tags=["tasks"])
 async def resolve_task(
     task_id: int, resolution: Resolution, request: Request, db: Db
 ) -> CaseView:
-    task = await db.scalar(
-        select(ServiceTask).where(ServiceTask.id == task_id).with_for_update()
-    )
-    if task is None:
-        raise HTTPException(404, "Task not found.")
-    outcome = await db.get(Outcome, task_id)
-    if outcome is None:
-        db.add(
-            Outcome(
-                task_id=task_id,
-                notes=resolution.notes.strip()
-                or "Resolved by user; no additional observations supplied.",
-            )
-        )
-    await db.commit()
+    task = await transition_task(db, task_id, "done", resolution.notes)
     return await snapshot(
         db, await get_case(db, task.case_id), request.app.state.settings
     )

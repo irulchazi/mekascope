@@ -3,7 +3,16 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Integer, LargeBinary, String, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -44,6 +53,12 @@ class Image(Base):
 
 class ServiceTask(Base):
     __tablename__ = "service_tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "board_status IN ('todo', 'in_progress', 'done')",
+            name="ck_service_tasks_board_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id"), unique=True)
@@ -51,6 +66,9 @@ class ServiceTask(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     recommendation: Mapped[dict] = mapped_column(JSONB)
+    board_status: Mapped[str] = mapped_column(
+        String(20), default="todo", server_default="todo"
+    )
 
 
 class Outcome(Base):
