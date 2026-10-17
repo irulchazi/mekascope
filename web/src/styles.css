@@ -48,6 +48,10 @@ h1, h2, h3, p { margin-top: 0; }
   gap: 16px;
   border-bottom: 1px solid var(--line-soft);
   background: rgba(8, 14, 16, .94);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(8px);
 }
 .brand { display: inline-flex; gap: 12px; align-items: center; padding: 0; border: 0; color: var(--text); background: none; text-align: left; }
 .brand-mark { width: 40px; height: 40px; border: 1px solid #4b807b; border-radius: 11px; color: var(--teal); display: grid; place-items: center; background: #102427; box-shadow: inset 0 0 20px rgba(120, 224, 207, .07); }
@@ -61,7 +65,7 @@ h1, h2, h3, p { margin-top: 0; }
 .badge-dot, .record-dot, .mini-pulse, .context-live span { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 10px rgba(120, 224, 207, .6); display: inline-block; flex: 0 0 auto; }
 
 .workspace { width: min(1720px, 100%); margin: 0 auto; display: grid; grid-template-columns: 240px minmax(0, 1fr) 286px; align-items: start; min-height: calc(100vh - 77px); }
-.sidebar { min-height: calc(100vh - 77px); position: sticky; top: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line-soft); padding: 34px 15px 21px; background: rgba(10, 18, 20, .52); }
+.sidebar { min-height: calc(100vh - 77px); position: sticky; top: 77px; display: flex; flex-direction: column; border-right: 1px solid var(--line-soft); padding: 34px 15px 21px; background: rgba(10, 18, 20, .52); }
 .sidebar-heading, .section-label, .section-kicker, .section-hint, .source-count, .preview-caption, .diagnosis-label { color: var(--muted-2); font: 700 0.875rem/1.4 var(--mono); letter-spacing: .08em; }
 .sidebar-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; margin-bottom: 18px; }
 .sidebar-heading > span { color: #4f686c; }
@@ -338,7 +342,7 @@ h1, h2, h3, p { margin-top: 0; }
 .translation-flow svg { color: #5a8076; }
 .back-to-bike { margin-top: 20px; }
 
-.context-rail { min-height: calc(100vh - 77px); position: sticky; top: 0; border-left: 1px solid var(--line-soft); padding: 26px 18px 24px; display: flex; flex-direction: column; gap: 14px; background: rgba(10, 18, 20, .42); }
+.context-rail { min-height: calc(100vh - 77px); position: sticky; top: 77px; border-left: 1px solid var(--line-soft); padding: 26px 18px 24px; display: flex; flex-direction: column; gap: 14px; background: rgba(10, 18, 20, .42); }
 .context-card, .data-card { padding: 17px; }
 .context-rail .section-label { margin-bottom: 20px; }
 .context-live { display: inline-flex; align-items: center; gap: 6px; color: var(--teal); font: 700 0.75rem var(--mono); }
