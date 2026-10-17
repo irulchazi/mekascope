@@ -128,3 +128,39 @@ async def test_board_migration_backfills_existing_outcomes():
                 (task_ids[0], "todo"),
                 (task_ids[1], "done"),
             ]
+
+
+async def test_task_priority_updates_persist_without_changing_ai_assessment(client):
+    path, case = await verified(client)
+    task = (await client.post(path + "/tasks", json={"approved": True})).json()["task"]
+    assert task["priority"] == case["verification"]["severity"]
+    endpoint = f"/api/v1/tasks/{task['id']}/priority"
+    for priority in ("low", "medium", "high", "unknown"):
+        response = await client.put(endpoint, json={"priority": priority})
+        assert response.status_code == 200
+        assert response.json()["priority"] == priority
+        restored = (await client.get(path)).json()
+        assert restored["task"]["priority"] == priority
+        assert restored["task"]["recommendation"] == case["verification"]
+        assert restored["verification"] == case["verification"]
+        assert restored["task"]["board_status"] == "todo"
+    assert (await client.put(endpoint, json={"priority": "urgent"})).status_code == 422
+    assert (await client.put(endpoint, json={})).status_code == 422
+    assert (
+        await client.put("/api/v1/tasks/999999/priority", json={"priority": "low"})
+    ).status_code == 404
+
+
+async def test_priority_and_board_status_changes_do_not_overwrite_each_other(client):
+    path, _ = await verified(client)
+    task = (await client.post(path + "/tasks", json={"approved": True})).json()["task"]
+    priority, status = await asyncio.gather(
+        client.put(f"/api/v1/tasks/{task['id']}/priority", json={"priority": "high"}),
+        client.put(
+            f"/api/v1/tasks/{task['id']}/status", json={"status": "in_progress"}
+        ),
+    )
+    assert priority.status_code == status.status_code == 200
+    restored = (await client.get(path)).json()["task"]
+    assert restored["priority"] == "high"
+    assert restored["board_status"] == "in_progress"

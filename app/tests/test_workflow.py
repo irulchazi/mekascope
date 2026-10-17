@@ -12,11 +12,12 @@ from google.genai import errors
 from PIL import Image
 from sqlalchemy import update
 
-from app.config import ROOT
+from app.config import ROOT, Settings
 from app.main import create_app
 from app.models import Case
 from app.schemas import Annotation, ScanResult
 from app.services import now
+from app.tests.support import temporary_database
 
 
 def photo(format="PNG"):
@@ -344,6 +345,40 @@ async def test_health_openapi_cors_and_migration(client, database_url):
     await asyncio.to_thread(command.check, config)
 
 
+async def test_readiness_rejects_pending_migration_and_approval_recovers(provider):
+    async with temporary_database() as url:
+        application = create_app(
+            Settings(_env_file=None, database_url=url, gemini_api_key=""),
+            provider,
+        )
+        config = Config(str(ROOT / "app/alembic.ini"))
+        config.attributes["database_url"] = url
+        async with (
+            application.router.lifespan_context(application),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=application), base_url="http://test"
+            ) as client,
+        ):
+            path, case = await verified(client)
+            await asyncio.to_thread(command.downgrade, config, "0005")
+            assert (await client.get("/health")).status_code == 200
+            response = await client.get("/health/ready")
+            assert response.status_code == 503
+            assert "migrations" in response.json()["detail"]
+            assert (
+                await client.post(path + "/tasks", json={"approved": True})
+            ).status_code == 503
+
+            await asyncio.to_thread(command.upgrade, config, "head")
+            assert (await client.get("/health/ready")).status_code == 200
+            approval = await client.post(path + "/tasks", json={"approved": True})
+            assert approval.status_code == 201
+            assert approval.json()["verification"] == case["verification"]
+            retry = await client.post(path + "/tasks", json={"approved": True})
+            assert retry.status_code == 200
+            assert retry.json()["task"]["id"] == approval.json()["task"]["id"]
+
+
 def test_annotation_and_recognition_validation():
     with pytest.raises(ValueError):
         Annotation(label="Invalid", box=[900, 0, 10, 100])
@@ -382,3 +417,53 @@ async def test_component_descriptions_persist_and_legacy_scans_load(
     legacy = await client.get(path)
     assert legacy.status_code == 200
     assert legacy.json()["scan"]["annotations"][0]["description"] == ""
+
+
+async def test_self_resolved_case_is_persisted_and_blocks_approval(client):
+    path, case = await verified(client)
+    first = await client.post(path + "/self-resolve")
+    assert first.status_code == 200
+    resolved_at = first.json()["self_resolved_at"]
+    assert resolved_at
+    assert first.json()["task"] is None
+    again = await client.post(path + "/self-resolve")
+    assert again.status_code == 200
+    assert again.json()["self_resolved_at"] == resolved_at
+    restored = (await client.get(path)).json()
+    assert restored["self_resolved_at"] == resolved_at
+    assert restored["task"] is None
+    assert (
+        await client.post(path + "/tasks", json={"approved": True})
+    ).status_code == 409
+    assert all(
+        task["case_id"] != case["id"]
+        for task in (await client.get("/api/v1/tasks")).json()
+    )
+
+
+async def test_self_resolved_requires_verification_and_no_existing_task(client):
+    case = await new_case(client)
+    assert (
+        await client.post(f"/api/v1/cases/{case['id']}/self-resolve")
+    ).status_code == 409
+    assert (
+        await client.post(f"/api/v1/cases/{uuid4()}/self-resolve")
+    ).status_code == 404
+    path, _ = await verified(client)
+    approved = await client.post(path + "/tasks", json={"approved": True})
+    assert approved.status_code == 201
+    assert (await client.post(path + "/self-resolve")).status_code == 409
+    restored = (await client.get(path)).json()
+    assert restored["self_resolved_at"] is None
+    assert restored["task"]["id"] == approved.json()["task"]["id"]
+
+
+async def test_self_resolved_and_task_approval_are_mutually_exclusive(client):
+    path, _ = await verified(client)
+    skipped, approved = await asyncio.gather(
+        client.post(path + "/self-resolve"),
+        client.post(path + "/tasks", json={"approved": True}),
+    )
+    assert (skipped.status_code, approved.status_code) in {(200, 409), (409, 201)}
+    restored = (await client.get(path)).json()
+    assert bool(restored["self_resolved_at"]) != bool(restored["task"])

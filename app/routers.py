@@ -20,12 +20,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog import CATALOG, SAMPLE_CONTEXT, SAMPLE_IMAGE
 from app.images import normalize_image, read_image
-from app.models import Case, Image, ServiceTask
+from app.models import Case, Equipment, Image, ServiceRecord, ServiceTask
 from app.schemas import (
     Approval,
     CaseView,
+    EquipmentInput,
+    EquipmentView,
     MaintenanceTaskView,
     Resolution,
+    ServiceRecordInput,
+    ServiceRecordView,
+    TaskPriorityUpdate,
     TaskStatusUpdate,
 )
 from app.services import (
@@ -33,6 +38,7 @@ from app.services import (
     busy,
     get_case,
     maintenance_tasks,
+    now,
     snapshot,
     transition_task,
 )
@@ -51,6 +57,90 @@ Db = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/catalog", tags=["catalog"])
 async def catalog() -> dict:
     return CATALOG
+
+
+@router.get("/equipment", response_model=list[EquipmentView], tags=["equipment"])
+async def list_equipment(db: Db):
+    return (
+        await db.scalars(
+            select(Equipment).order_by(Equipment.created_at.desc(), Equipment.id)
+        )
+    ).all()
+
+
+@router.post(
+    "/equipment", response_model=EquipmentView, status_code=201, tags=["equipment"]
+)
+async def create_equipment(body: EquipmentInput, db: Db):
+    equipment = Equipment(**body.model_dump())
+    db.add(equipment)
+    await db.commit()
+    await db.refresh(equipment)
+    return equipment
+
+
+@router.put(
+    "/equipment/{equipment_id}", response_model=EquipmentView, tags=["equipment"]
+)
+async def update_equipment(equipment_id: UUID, body: EquipmentInput, db: Db):
+    equipment = await db.get(Equipment, equipment_id)
+    if equipment is None:
+        raise HTTPException(404, "Equipment not found.")
+    for key, value in body.model_dump().items():
+        setattr(equipment, key, value)
+    await db.commit()
+    await db.refresh(equipment)
+    return equipment
+
+
+@router.get(
+    "/service-records", response_model=list[ServiceRecordView], tags=["service history"]
+)
+async def list_service_records(db: Db, equipment_id: UUID | None = None):
+    query = select(ServiceRecord).order_by(
+        ServiceRecord.performed_on.desc(),
+        ServiceRecord.created_at.desc(),
+        ServiceRecord.id,
+    )
+    if equipment_id is not None:
+        query = query.where(ServiceRecord.equipment_id == equipment_id)
+    return (await db.scalars(query)).all()
+
+
+@router.post(
+    "/service-records",
+    response_model=ServiceRecordView,
+    status_code=201,
+    tags=["service history"],
+)
+async def create_service_record(body: ServiceRecordInput, db: Db):
+    if await db.get(Equipment, body.equipment_id) is None:
+        raise HTTPException(
+            404, "Equipment not found. Save an equipment profile first."
+        )
+    record = ServiceRecord(**body.model_dump())
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return record
+
+
+@router.put(
+    "/service-records/{record_id}",
+    response_model=ServiceRecordView,
+    tags=["service history"],
+)
+async def update_service_record(record_id: UUID, body: ServiceRecordInput, db: Db):
+    record = await db.get(ServiceRecord, record_id)
+    if record is None:
+        raise HTTPException(404, "Service record not found.")
+    if await db.get(Equipment, body.equipment_id) is None:
+        raise HTTPException(404, "Equipment not found.")
+    for key, value in body.model_dump().items():
+        setattr(record, key, value)
+    await db.commit()
+    await db.refresh(record)
+    return record
 
 
 @router.post("/images/preview", tags=["images"], response_class=Response)
@@ -74,6 +164,7 @@ async def create_case(
     symptom: Annotated[str, Form(min_length=1, max_length=4000)],
     configuration: Annotated[str, Form(max_length=4000)] = "",
     service: Annotated[str, Form(max_length=4000)] = "",
+    equipment_id: Annotated[UUID | None, Form()] = None,
     image: Annotated[UploadFile | None, File()] = None,
 ) -> CaseView:
     symptom = symptom.strip()
@@ -81,6 +172,10 @@ async def create_case(
         raise HTTPException(422, "Describe the symptom before starting a case.")
     settings = request.app.state.settings
     if source == "sample":
+        if equipment_id is not None:
+            raise HTTPException(
+                422, "Use an uploaded photo with a saved equipment profile."
+            )
         if image is not None:
             raise HTTPException(422, "Choose either the sample or an uploaded photo.")
         data = await asyncio.to_thread(SAMPLE_IMAGE.read_bytes)
@@ -100,6 +195,60 @@ async def create_case(
             "configuration": configuration.strip(),
             "service": service.strip(),
         }
+        if equipment_id is not None:
+            equipment = await db.get(Equipment, equipment_id)
+            if equipment is None:
+                raise HTTPException(404, "Equipment not found. Choose another profile.")
+            records = (
+                await db.scalars(
+                    select(ServiceRecord)
+                    .where(ServiceRecord.equipment_id == equipment_id)
+                    .order_by(
+                        ServiceRecord.performed_on.desc(),
+                        ServiceRecord.created_at.desc(),
+                        ServiceRecord.id,
+                    )
+                    .limit(20)
+                )
+            ).all()
+            configuration_notes = "\n".join(
+                filter(
+                    None,
+                    [
+                        f"Manufacturer: {equipment.manufacturer}"
+                        if equipment.manufacturer
+                        else "",
+                        f"Model: {equipment.model}" if equipment.model else "",
+                        f"Serial number: {equipment.serial_number}"
+                        if equipment.serial_number
+                        else "",
+                        equipment.configuration,
+                    ],
+                )
+            )
+            service_notes = "\n\n".join(
+                f"{record.performed_on.isoformat()} — {record.title} ({record.service_type})\n"
+                + (
+                    f"Performed by: {record.performed_by}\n"
+                    if record.performed_by
+                    else ""
+                )
+                + record.notes
+                for record in records
+            )
+            context.update(
+                {
+                    "equipment_id": str(equipment.id),
+                    "name": equipment.name,
+                    "model": equipment.model,
+                    "configuration": "\n".join(
+                        filter(None, [configuration_notes, configuration.strip()])
+                    )[:4000],
+                    "service": "\n\n".join(
+                        filter(None, [service_notes, service.strip()])
+                    )[:4000],
+                }
+            )
     case = Case(symptom=symptom, context=context)
     db.add(case)
     await db.flush()
@@ -215,6 +364,10 @@ async def approve_task(
         raise HTTPException(
             409, "Complete guided verification before approving a task."
         )
+    if case.self_resolved_at:
+        raise HTTPException(
+            409, "This case was marked self-resolved; task approval is unavailable."
+        )
     task = await db.scalar(select(ServiceTask).where(ServiceTask.case_id == case_id))
     if task:
         response.status_code = 200
@@ -222,6 +375,26 @@ async def approve_task(
         db.add(ServiceTask(case_id=case_id, recommendation=case.verification))
     await db.commit()
     return await snapshot(db, case, request.app.state.settings)
+
+
+@router.post("/cases/{case_id}/self-resolve", response_model=CaseView, tags=["tasks"])
+async def self_resolve_case(case_id: UUID, request: Request, db: Db) -> CaseView:
+    case = await get_case(db, case_id, lock=True)
+    settings = request.app.state.settings
+    if not case.verification or busy(case, settings):
+        raise HTTPException(
+            409, "Complete guided verification before marking the case self-resolved."
+        )
+    task = await db.scalar(select(ServiceTask).where(ServiceTask.case_id == case_id))
+    if task:
+        raise HTTPException(
+            409,
+            "A task already exists for this case; resolve it from the maintenance board.",
+        )
+    if case.self_resolved_at is None:
+        case.self_resolved_at = now()
+    await db.commit()
+    return await snapshot(db, case, settings)
 
 
 @router.get("/tasks", response_model=list[MaintenanceTaskView], tags=["tasks"])
@@ -236,6 +409,22 @@ async def update_task_status(
     task_id: int, update: TaskStatusUpdate, db: Db
 ) -> MaintenanceTaskView:
     await transition_task(db, task_id, update.status, update.notes)
+    return (await maintenance_tasks(db, task_id))[0]
+
+
+@router.put(
+    "/tasks/{task_id}/priority", response_model=MaintenanceTaskView, tags=["tasks"]
+)
+async def update_task_priority(
+    task_id: int, update: TaskPriorityUpdate, db: Db
+) -> MaintenanceTaskView:
+    task = await db.scalar(
+        select(ServiceTask).where(ServiceTask.id == task_id).with_for_update()
+    )
+    if task is None:
+        raise HTTPException(404, "Task not found.")
+    task.priority = update.priority
+    await db.commit()
     return (await maintenance_tasks(db, task_id))[0]
 
 

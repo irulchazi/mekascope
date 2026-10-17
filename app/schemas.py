@@ -1,6 +1,6 @@
 """Public DTOs and the structured response contracts used with Gemini."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -10,10 +10,40 @@ Score = Annotated[int, Field(ge=0, le=100)]
 Text = Annotated[str, Field(min_length=1, max_length=4000)]
 Stage = Literal["observe", "understand", "investigate", "verify", "act"]
 BoardStatus = Literal["todo", "in_progress", "done"]
+Priority = Literal["low", "medium", "high", "unknown"]
 
 
 class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class EquipmentInput(Schema):
+    name: str = Field(min_length=1, max_length=200)
+    manufacturer: str = Field(default="", max_length=200)
+    model: str = Field(default="", max_length=200)
+    serial_number: str = Field(default="", max_length=200)
+    configuration: str = Field(default="", max_length=4000)
+
+
+class EquipmentView(EquipmentInput):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ServiceRecordInput(Schema):
+    equipment_id: UUID
+    title: str = Field(min_length=1, max_length=200)
+    performed_on: date
+    service_type: Literal["maintenance", "repair", "inspection", "upgrade"]
+    performed_by: str = Field(default="", max_length=200)
+    notes: Text
+
+
+class ServiceRecordView(ServiceRecordInput):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
 
 
 class Annotation(Schema):
@@ -85,7 +115,7 @@ class VerificationResult(Schema):
     conclusion: Literal["supported", "inconclusive"]
     diagnosis: Text
     confidence: Score
-    severity: Literal["low", "medium", "high", "unknown"]
+    severity: Priority
     summary: Text
     action: Text
     verification: Text
@@ -106,6 +136,7 @@ class TaskView(Schema):
     created_at: datetime
     status: Literal["open", "resolved"]
     board_status: BoardStatus
+    priority: Priority
     recommendation: VerificationResult
     resolved_at: datetime | None = None
     outcome_notes: str | None = None
@@ -123,6 +154,10 @@ class TaskStatusUpdate(Schema):
     notes: str = Field(default="", max_length=4000)
 
 
+class TaskPriorityUpdate(Schema):
+    priority: Priority
+
+
 class CaseView(Schema):
     id: UUID
     created_at: datetime
@@ -138,6 +173,7 @@ class CaseView(Schema):
     operation_expires_at: datetime | None
     last_error: str | None
     task: TaskView | None
+    self_resolved_at: datetime | None = None
 
 
 class Approval(Schema):

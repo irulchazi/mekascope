@@ -40,6 +40,7 @@ def task_view(task: ServiceTask, outcome: Outcome | None) -> TaskView:
         status="resolved" if outcome else "open",
         board_status="done" if outcome else task.board_status,
         recommendation=task.recommendation,
+        priority=task.priority or task.recommendation["severity"],
         resolved_at=outcome.resolved_at if outcome else None,
         outcome_notes=outcome.notes if outcome else None,
     )
@@ -158,6 +159,7 @@ async def snapshot(db: AsyncSession, case: Case, settings: Settings) -> CaseView
         if not case.operation or active
         else "The previous analysis was interrupted. Retry the operation.",
         task=task_view(task, outcome) if task else None,
+        self_resolved_at=case.self_resolved_at,
     )
 
 
