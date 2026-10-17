@@ -68,7 +68,7 @@ h1, h2, h3, p { margin-top: 0; }
 .stage-list { display: grid; gap: 4px; }
 .stage-button { width: 100%; border: 1px solid transparent; border-radius: 10px; padding: 12px 11px; display: flex; align-items: center; gap: 11px; color: var(--muted); background: transparent; text-align: left; transition: background .2s, border-color .2s, color .2s; }
 .stage-button:not(:disabled):hover { background: #132123; color: var(--text); }
-.stage-button.is-active { color: var(--text); background: #14282a; border-color: #2a504d; box-shadow: inset 3px 0 0 var(--teal); }
+.stage-button.is-active { color: var(--text); background: #14282a; border-color: #2a504d; }
 .stage-button:disabled { opacity: .43; }
 .stage-icon { display: grid; place-items: center; flex: 0 0 auto; width: 33px; height: 33px; border: 1px solid #294044; border-radius: 8px; color: #8ca3a5; background: #101c1f; }
 .stage-button.is-active .stage-icon { color: var(--teal); border-color: #3d726e; background: #173334; }
