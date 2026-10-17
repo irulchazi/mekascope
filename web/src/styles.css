@@ -556,9 +556,10 @@ body:has(.photo-viewer[open]) { overflow: hidden; }
 .inspection-context .data-card { grid-column: auto; gap: 8px; }
 .inspection-context .section-label { flex-wrap: wrap; margin-bottom: 14px; }
 .inspection-context .data-card .section-label { margin-bottom: 5px; }
-.inspection-context .agent-note { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px; }
-.inspection-context .agent-note-icon { width: 26px; height: 26px; margin: 0; }
-.inspection-context .agent-note p { flex: 1 1 220px; margin: 0; }
+.inspection-context .agent-note { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 2px 14px; padding: 16px 18px; }
+.inspection-context .agent-note-icon { grid-row: 1 / span 2; width: 32px; height: 32px; margin: 0; }
+.inspection-context .agent-note .section-kicker { align-self: center; min-height: 32px; display: flex; align-items: center; }
+.inspection-context .agent-note p { grid-column: 2; margin: 0; max-width: 80ch; color: var(--muted); font-size: 0.9375rem; line-height: 1.6; }
 .inspection-context .note-bottom { display: none; }
 @media (min-width: 701px) and (max-width: 1250px) {
   .workspace--observe { grid-template-columns: 214px minmax(0, 1fr); }
@@ -758,6 +759,11 @@ a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 }
 
 /* Light theme: invert the dark UI, then restore photos and media */
-html[data-theme=light] { filter: invert(1) hue-rotate(180deg); color-scheme: light; }
+html[data-theme=light] { filter: invert(1) hue-rotate(180deg) sepia(.1) saturate(1.2) brightness(.96); color-scheme: light; }
 html[data-theme=light] img, html[data-theme=light] video, html[data-theme=light] canvas { filter: invert(1) hue-rotate(180deg); }
 .theme-toggle { width: 40px; height: 40px; }
+/* The photo frame and its overlays (vignette, boxes, labels) are styled for the photo, not the theme: undo the page inversion for the whole frame */
+html[data-theme=light] .visual-frame { filter: invert(1) hue-rotate(180deg); }
+html[data-theme=light] .visual-frame img { filter: none; }
+/* Dialogs render in the top layer and escape the page filter, so their images must not be flipped back */
+html[data-theme=light] dialog img { filter: none; }

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { Activity, Aperture, ArrowLeft, ArrowRight, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, Gauge, History, Info, LockKeyhole, Maximize2, PackageCheck, RotateCcw, ScanLine, Sparkles, Upload, Wrench } from 'lucide-react'
+import { Activity, Aperture, ArrowLeft, ArrowRight, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, Gauge, History, Info, LockKeyhole, Maximize2, Moon, PackageCheck, RotateCcw, ScanLine, Sparkles, Sun, Upload, Wrench } from 'lucide-react'
 import { api, ApiError, imageUrl, type Annotation, type Case, type Catalog, type Pump, type Step } from './api'
 import { stages, type BikeStage, type Stage } from './data'
 import PhotoViewer from './PhotoViewer'
@@ -100,6 +100,17 @@ function PumpPreview({ pump, back }: { pump: Pump; back: () => void }) {
     <div className="translation-card"><div><span className="section-kicker">ONE EQUIPMENT MODEL</span><h3>From bicycle to production line</h3></div><div className="translation-flow"><span>Component</span><ArrowRight size={15} /><span>Context</span><ArrowRight size={15} /><span>Evidence</span><ArrowRight size={15} /><span>Action</span></div></div>
     <button className="text-button back-to-bike" onClick={back}><ArrowLeft size={16} /> Back to bicycle case</button>
   </>
+}
+
+function ThemeToggle() {
+  const [light, setLight] = useState(() => document.documentElement.dataset.theme === 'light')
+  const toggle = () => {
+    const next = !light
+    setLight(next)
+    document.documentElement.dataset.theme = next ? 'light' : 'dark'
+    try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch { /* storage unavailable */ }
+  }
+  return <button className="icon-button theme-toggle" onClick={toggle} aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'}>{light ? <Moon size={18} /> : <Sun size={18} />}</button>
 }
 
 export default function App() {
@@ -244,7 +255,7 @@ export default function App() {
   const contextAvailable = <div className="data-card"><Label end={<span className="info-tip" tabIndex={0} data-tip="Only supplied context is used in analysis."><Info size={14} /></span>}>CONTEXT AVAILABLE</Label><div><span><Boxes size={15} /> Equipment photo</span>{photo && <CircleCheck size={14} />}</div><div><span><BookOpen size={15} /> Configuration</span>{current?.context.configuration ? <CircleCheck size={14} /> : <span>Unknown</span>}</div><div><span><History size={15} /> Service history</span>{current?.context.service ? <CircleCheck size={14} /> : <span>Unknown</span>}</div></div>
 
   return <div className="app-shell">
-    <header className="topbar"><button className="brand" onClick={restart} disabled={busy || loading} aria-label="MekaScope, new case"><span className="brand-mark"><Aperture size={24} /></span><span className="brand-name">meka<span>scope</span><small>MECHANICAL INTELLIGENCE</small></span></button><div className="topbar-right"><span className="topbar-edition">BICYCLE INSPECTION</span><span className="simulation-badge"><span className="badge-dot" /> {isFactory ? 'STATIC PREVIEW' : 'GEMINI ANALYSIS'}</span></div></header>
+    <header className="topbar"><button className="brand" onClick={restart} disabled={busy || loading} aria-label="MekaScope, new case"><span className="brand-mark"><Aperture size={24} /></span><span className="brand-name">meka<span>scope</span><small>MECHANICAL INTELLIGENCE</small></span></button><div className="topbar-right"><ThemeToggle /><span className="topbar-edition">BICYCLE INSPECTION</span><span className="simulation-badge"><span className="badge-dot" /> {isFactory ? 'STATIC PREVIEW' : 'GEMINI ANALYSIS'}</span></div></header>
     <div className={`workspace ${stage === 'observe' ? 'workspace--observe' : ''}`}>
       <nav className="sidebar" aria-label="Inspection workflow"><div className="sidebar-heading">THE WORKFLOW <span>01—05</span></div><div className="stage-list">{stages.map((s, index) => {
         const Icon = icons[index]; const locked = s.id !== 'observe' && !current?.available_stages.includes(s.id)
