@@ -371,14 +371,13 @@ h2, h3, h4 { font-weight: 650; }
 .data-card > div:not(.section-label) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--teal); }
 .data-card > div:not(.section-label) span { display: inline-flex; align-items: center; gap: 8px; color: #bbceca; font-size: 0.875rem; }
 .data-card > small { color: var(--muted-2); font-size: 0.75rem; line-height: 1.35; margin-top: 2px; }
-.restart-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #365055; border-radius: 7px; padding: 11px; color: #a9bfbc; background: transparent; font-size: 0.9375rem; font-weight: 700; }
-.restart-button:hover { color: var(--text); border-color: var(--teal); }
+.new-case-button { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 16px; padding: 10px 12px; border: 1px dashed #34494d; border-radius: 10px; color: #8ea5a7; background: transparent; font-size: 0.875rem; font-weight: 600; transition: color .2s, border-color .2s, background .2s; }
+.new-case-button:hover:not(:disabled) { color: var(--text); border-color: #4d6a6e; background: #0f1a1c; }
 .page-footer { display: flex; justify-content: space-between; gap: 15px; border-top: 1px solid var(--line-soft); margin-top: 32px; padding-top: 16px; color: #53696c; font: 600 0.75rem/1.4 var(--mono); letter-spacing: .05em; }
 
 @media (max-width: 1250px) {
   .workspace { grid-template-columns: 214px minmax(0, 1fr); }
   .context-rail { position: static; min-height: 0; grid-column: 2; border-left: 0; border-top: 1px solid var(--line-soft); display: grid; grid-template-columns: repeat(3, 1fr); align-items: start; }
-  .restart-button { grid-column: 1 / -1; }
   .sidebar { grid-row: 1 / span 2; }
   .context-rail .context-card, .context-rail .agent-note, .context-rail .data-card { height: 100%; }
 }
@@ -503,7 +502,6 @@ legend { color: var(--teal); font-size: 1.125rem; font-weight: 700; margin-botto
 .workspace--observe .main-content { grid-column: 2; }
 .workspace--observe .page-heading { padding: 24px 0 20px; }
 .workspace--observe .context-rail { position: static; min-height: 0; grid-column: 2; border-left: 0; border-top: 1px solid var(--line-soft); display: grid; grid-template-columns: 1fr; }
-.workspace--observe .context-rail .restart-button { grid-column: auto; justify-self: end; }
 .inspection-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
 .inspection-layout > :not(.inspection-preview, .inspection-context) { grid-column: 1 / -1; }
 .inspection-layout .intake-form { margin-top: 0; padding: 18px; }
