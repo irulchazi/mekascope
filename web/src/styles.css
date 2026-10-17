@@ -510,7 +510,6 @@ legend { color: var(--teal); font-size: 1.125rem; font-weight: 700; margin-botto
 .photo-components-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-bottom: 12px; }
 .photo-components-heading strong { color: var(--text); font-size: .875rem; }
 .photo-components-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.photo-components-actions > span { color: var(--muted); font-size: .75rem; }
 .photo-components .photo-components-all { width: auto; white-space: nowrap; }
 .photo-components ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .photo-components li { min-width: 0; }
