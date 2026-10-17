@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, Aperture, ArrowLeft, ArrowRight, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, Gauge, History, Info, LockKeyhole, Maximize2, PackageCheck, RotateCcw, ScanLine, Sparkles, Wrench } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Activity, Aperture, ArrowLeft, ArrowRight, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, Gauge, History, Info, LockKeyhole, Maximize2, PackageCheck, RotateCcw, ScanLine, Sparkles, Upload, Wrench } from 'lucide-react'
 import { api, ApiError, imageUrl, type Annotation, type Case, type Catalog, type Pump, type Step } from './api'
 import { stages, type BikeStage, type Stage } from './data'
 import PhotoViewer from './PhotoViewer'
@@ -45,9 +45,10 @@ function Frame({ src, annotations = [], pending = false, preview = false, fitted
     {zoomable && <button type="button" className="photo-expand" aria-label="Enlarge inspection photo" onClick={() => setViewerOpen(true)}><span><Maximize2 size={16} /> Enlarge photo</span></button>}
   </div>{annotations.length > 0 && <figcaption><PhotoComponents annotations={annotations} selectedAnnotation={selectedAnnotation} selectAnnotation={setActiveAnnotation} /></figcaption>}{viewerOpen && <PhotoViewer src={imageUrl(src)} annotations={annotations} selectedAnnotation={selectedAnnotation} selectAnnotation={setActiveAnnotation} close={() => setViewerOpen(false)} />}</figure>
 }
-function PhotoPicker({ label, photo, required = false, disabled = false, onChange }: { label: string; photo: File | null; required?: boolean; disabled?: boolean; onChange: (photo: File | null) => void }) {
+function PhotoPicker({ label, photo, required = false, disabled = false, onChange, action }: { action?: ReactNode; label: string; photo: File | null; required?: boolean; disabled?: boolean; onChange: (photo: File | null) => void }) {
   const uploadInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
+  const inputId = useId()
   useEffect(() => {
     if (!photo) {
       if (uploadInput.current) uploadInput.current.value = ''
@@ -55,8 +56,9 @@ function PhotoPicker({ label, photo, required = false, disabled = false, onChang
     }
   }, [photo])
   return <div className="photo-picker">
-    <label>{label}<input ref={uploadInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" required={required && !photo} disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} /></label>
-    <div className="photo-picker-actions"><button type="button" className="secondary-button" disabled={disabled} onClick={() => cameraInput.current?.click()}><Camera size={16} /> Take photo</button><small>{photo ? photo.name : 'JPEG, PNG, WebP, or HEIC/HEIF · up to 10 MiB'}</small></div>
+    <label htmlFor={inputId}>{label}</label>
+    <input id={inputId} ref={uploadInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" required={required && !photo} disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} />
+    <div className="photo-picker-actions"><button type="button" className="secondary-button compact" disabled={disabled} onClick={() => uploadInput.current?.click()}><Upload size={15} /> Choose file</button><button type="button" className="secondary-button compact" disabled={disabled} onClick={() => cameraInput.current?.click()}><Camera size={15} /> Take photo</button>{photo ? <small>{photo.name}</small> : <span className="info-tip" tabIndex={0} data-tip="JPEG, PNG, WebP, or HEIC/HEIF · up to 10 MiB"><Info size={14} /></span>}{action && <span className="photo-picker-submit">{action}</span>}</div>
     <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} />
   </div>
 }
@@ -73,11 +75,21 @@ function StepForm({ step, disabled, save }: { step: Step; disabled: boolean; sav
     <span className="verify-step-index">{step.completed ? <Check size={15} /> : <Crosshair size={15} />}</span>
     <div className="step-fields"><strong>{step.title}</strong><p>{step.instruction}</p>
       <label>Observations (optional)<textarea aria-label={`Observations: ${step.title}`} maxLength={4000} value={observation} onChange={e => setObservation(e.target.value)} disabled={disabled} /></label>
-      <PhotoPicker label="Follow-up photo (optional)" photo={photo} disabled={disabled} onChange={setPhoto} />
+      <PhotoPicker label="Follow-up photo (optional)" photo={photo} disabled={disabled} onChange={setPhoto} action={<button className="secondary-button compact" disabled={disabled}>{step.completed ? 'Save check' : 'Confirm check completed'} <Check size={15} /></button>} />
       {step.image_url && <a href={imageUrl(step.image_url)} target="_blank" rel="noreferrer">View saved evidence photo</a>}
-      <button className="secondary-button" disabled={disabled}>{step.completed ? 'Save check' : 'Confirm check completed'} <Check size={15} /></button>
     </div>
   </form>
+}
+function StepsPanel({ steps, disabled, save }: { steps: Step[]; disabled: boolean; save: (step: Step, body: FormData) => Promise<boolean> }) {
+  const [index, setIndex] = useState(() => Math.max(0, steps.findIndex(step => !step.completed)))
+  return <div className="panel verify-steps">
+    <Label end={<span className="section-hint">STEP {index + 1} OF {steps.length}</span>}>INSPECTION STEPS</Label>
+    {steps.map((step, i) => <div key={step.id} hidden={i !== index}><StepForm step={step} disabled={disabled} save={body => save(step, body)} /></div>)}
+    <div className="step-nav">
+      <button type="button" className="secondary-button compact" disabled={index === 0} onClick={() => setIndex(index - 1)}><ArrowLeft size={15} /> Previous</button>
+      <button type="button" className="secondary-button compact" disabled={index === steps.length - 1} onClick={() => setIndex(index + 1)}>Next <ArrowRight size={15} /></button>
+    </div>
+  </div>
 }
 function PumpPreview({ pump, back }: { pump: Pump; back: () => void }) {
   return <>
@@ -273,7 +285,7 @@ export default function App() {
             </>}
             {stage === 'verify' && current && investigation && <>
               <div className="verification-banner"><span><Crosshair size={18} /> GUIDED INSPECTION</span><p>Confirm each check. Findings and follow-up photos are optional.</p></div><Frame src={current.image_url} annotations={scan?.annotations} />
-              <div className="verify-grid"><div className="panel verify-steps"><Label>INSPECTION STEPS</Label>{current.steps.map(step => <StepForm key={step.id} step={step} disabled={busy || !!verification} save={body => run('Saving verification evidence…', () => api.saveStep(current.id, step.id, body))} />)}</div><div className="panel confidence-panel"><Label>DIAGNOSIS CONFIDENCE</Label><div className="confidence-comparison"><div><span>BEFORE CHECK</span><strong>{investigation.hypotheses[0]?.confidence}<small>%</small></strong></div><ArrowRight size={23} /><div className={`confidence-after ${verification ? 'is-confirmed' : ''}`}><span>AFTER CHECK</span><strong>{verification?.confidence ?? '—'}<small>{verification ? '%' : ''}</small></strong></div></div><p>{verification?.summary || 'Confidence may increase, decrease, or remain unchanged after review.'}</p><p className="muted-copy">A confirmation records that you performed a check. Only supplied findings can establish its outcome.</p></div></div>
+              <div className="verify-grid"><StepsPanel steps={current.steps} disabled={busy || !!verification} save={(step, body) => run('Saving verification evidence…', () => api.saveStep(current.id, step.id, body))} /><div className="panel confidence-panel"><Label>DIAGNOSIS CONFIDENCE</Label><div className="confidence-comparison"><div><span>BEFORE CHECK</span><strong>{investigation.hypotheses[0]?.confidence}<small>%</small></strong></div><ArrowRight size={23} /><div className={`confidence-after ${verification ? 'is-confirmed' : ''}`}><span>AFTER CHECK</span><strong>{verification?.confidence ?? '—'}<small>{verification ? '%' : ''}</small></strong></div></div><p>{verification?.summary || 'Confidence may increase, decrease, or remain unchanged after review.'}</p><p className="muted-copy">A confirmation records that you performed a check. Only supplied findings can establish its outcome.</p></div></div>
               <div className="next-strip"><div><CircleCheck size={19} /><span>{verification ? `Review complete: ${verification.conclusion}.` : 'Confirm all checks, then reassess the diagnosis.'}</span></div>{verification ? <button className="primary-button" onClick={() => changeStage('act')}>Review action plan <ArrowRight size={17} /></button> : <button className="primary-button" disabled={busy || !current.steps.every(s => s.completed)} onClick={() => void run('Reassessing the diagnosis…', () => api.analyze(current.id, 'verify'))}>Reassess diagnosis <ArrowRight size={17} /></button>}</div>
             </>}
             {stage === 'act' && current && verification && <>
