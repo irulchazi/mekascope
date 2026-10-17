@@ -21,12 +21,13 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; min-width: 320px; font-size: 1.125rem; line-height: 1.6; }
+body { margin: 0; min-width: 320px; font-size: 1rem; line-height: 1.6; }
 button { font: inherit; cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 img { display: block; max-width: 100%; }
 h1, h2, h3, p { margin-top: 0; }
+h2, h3, h4 { font-weight: 650; }
 
 .app-shell {
   min-height: 100vh;
@@ -107,7 +108,7 @@ h1, h2, h3, p { margin-top: 0; }
 .eyebrow-line { width: 16px; height: 1px; background: var(--teal); }
 .page-heading h1 { color: #f0f5f3; font-size: clamp(2.125rem, 3.36vw, 3.25rem); line-height: 1.08; letter-spacing: -.035em; margin-bottom: 12px; font-weight: 700; overflow-wrap: anywhere; }
 .page-heading h1 em { color: var(--teal); font-style: normal; }
-.page-heading p { color: var(--muted); font-size: 1.125rem; line-height: 1.55; max-width: 650px; margin-bottom: 0; }
+.page-heading p { color: var(--muted); font-size: 1.0625rem; line-height: 1.55; max-width: 80ch; margin-bottom: 0; }
 .panel, .context-card, .data-card { min-width: 0; overflow-wrap: anywhere; background: linear-gradient(145deg, #111c1f, #10191c); border: 1px solid var(--line); border-radius: 12px; }
 .section-label { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
 .section-label > span { min-width: 0; overflow-wrap: anywhere; }
@@ -204,27 +205,27 @@ h1, h2, h3, p { margin-top: 0; }
 
 .investigation-intro { border: 1px solid #31524e; background: linear-gradient(100deg, #152c2b, #132022); border-radius: 11px; padding: 17px 20px; display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .pulse-ring { display: grid; place-items: center; color: var(--teal); width: 42px; height: 42px; border: 1px solid #448077; border-radius: 11px; background: #1a3c38; flex: 0 0 auto; }
-.investigation-intro h2 { font-size: 1.25rem; margin: 4px 0 0; letter-spacing: -.02em; }
+.investigation-intro h2 { font-size: 1rem; font-weight: 450; line-height: 1.6; color: #d6e4e0; margin: 6px 0 0; letter-spacing: 0; }
 .investigation-intro .sample-tag { margin-left: auto; }
 .investigation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .sources-panel, .evidence-panel, .hypotheses-panel { padding: 19px; }
 .source-list { display: grid; gap: 0; }
-.source-item { display: flex; align-items: center; gap: 11px; min-height: 58px; border-top: 1px solid #203034; opacity: .55; }
+.source-item { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 12px 0; border-top: 1px solid #203034; opacity: .55; }
 .source-item:first-child { border-top: 0; }
 .source-item.is-done { opacity: 1; }
 .source-icon { width: 34px; height: 34px; display: grid; place-items: center; color: #85aaa6; background: #1a2b2e; border: 1px solid #2d4849; border-radius: 8px; flex: 0 0 auto; }
 .source-item.is-done .source-icon { color: var(--teal); background: #193632; }
 .source-item > div { display: grid; gap: 4px; }
-.source-item strong { font-size: 0.9375rem; }
-.source-item small { color: var(--muted-2); font-size: 0.875rem; }
+.source-item strong { font-size: 0.9375rem; font-weight: 600; }
+.source-item small { color: var(--muted-2); font-size: 0.8125rem; line-height: 1.5; }
 .source-check { color: var(--teal); margin-left: auto; }
 .source-empty { width: 13px; height: 13px; margin-left: auto; border: 1px solid #52676b; border-radius: 50%; }
 .source-count { color: var(--teal); }
 .evidence-list { display: grid; }
 .evidence-list > div { display: flex; gap: 13px; align-items: flex-start; border-top: 1px solid #203034; padding: 14px 0; }
 .evidence-list > div:first-child { border-top: 0; padding-top: 4px; }
-.evidence-list span { color: var(--teal); font: 700 0.875rem var(--mono); padding-top: 3px; }
-.evidence-list p { color: #d2dfdb; font-size: 0.9375rem; line-height: 1.4; margin: 0; }
+.evidence-list span { flex: 0 0 auto; min-width: 1.6em; white-space: nowrap; color: var(--teal); font: 600 0.8125rem var(--mono); padding-top: 2px; }
+.evidence-list p { color: #d2dfdb; font-size: 0.9375rem; line-height: 1.5; margin: 0; }
 .pending-evidence { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); text-align: center; font-size: 0.9375rem; }
 .pending-evidence p { margin: 0; }
 .hypotheses-panel { margin-top: 14px; }
