@@ -14,8 +14,10 @@ from app.ai import DiagnosisProvider
 from app.config import Settings
 from app.models import Case, Image, Outcome, ServiceTask
 from app.schemas import (
+    BoardStatus,
     CaseView,
     InvestigationResult,
+    MaintenanceTaskView,
     ScanResult,
     TaskView,
     VerificationResult,
@@ -28,6 +30,74 @@ RESULTS = {
     "verify": VerificationResult,
 }
 COLUMNS = {"scan": "scan", "investigate": "investigation", "verify": "verification"}
+
+
+def task_view(task: ServiceTask, outcome: Outcome | None) -> TaskView:
+    """Serialize the same task state for the board and its source inspection."""
+    return TaskView(
+        id=task.id,
+        created_at=task.created_at,
+        status="resolved" if outcome else "open",
+        board_status="done" if outcome else task.board_status,
+        recommendation=task.recommendation,
+        resolved_at=outcome.resolved_at if outcome else None,
+        outcome_notes=outcome.notes if outcome else None,
+    )
+
+
+async def maintenance_tasks(
+    db: AsyncSession, task_id: int | None = None
+) -> list[MaintenanceTaskView]:
+    """List approved work with its inspection context in a single query."""
+    statement = (
+        select(ServiceTask, Case, Outcome)
+        .join(Case, Case.id == ServiceTask.case_id)
+        .outerjoin(Outcome, Outcome.task_id == ServiceTask.id)
+        .order_by(ServiceTask.created_at.desc(), ServiceTask.id.desc())
+    )
+    if task_id is not None:
+        statement = statement.where(ServiceTask.id == task_id)
+    rows = (await db.execute(statement)).all()
+    return [
+        MaintenanceTaskView(
+            **task_view(task, outcome).model_dump(),
+            case_id=case.id,
+            equipment=case.context.get("name") or "Bicycle inspection",
+            component=case.scan.get("component") if case.scan else None,
+            symptom=case.symptom,
+        )
+        for task, case, outcome in rows
+    ]
+
+
+async def transition_task(
+    db: AsyncSession, task_id: int, status: BoardStatus, notes: str = ""
+) -> ServiceTask:
+    """Persist a board move and record completed work as an inspection outcome."""
+    task = await db.scalar(
+        select(ServiceTask)
+        .where(ServiceTask.id == task_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if task is None:
+        raise HTTPException(404, "Task not found.")
+    outcome = await db.get(Outcome, task_id)
+    if outcome and status != "done":
+        raise HTTPException(
+            409, "This task is resolved. Its recorded outcome is final."
+        )
+    task.board_status = status
+    if status == "done" and outcome is None:
+        db.add(
+            Outcome(
+                task_id=task_id,
+                notes=notes.strip()
+                or "Resolved by user; no additional observations supplied.",
+            )
+        )
+    await db.commit()
+    return task
 
 
 def now() -> datetime:
@@ -87,16 +157,7 @@ async def snapshot(db: AsyncSession, case: Case, settings: Settings) -> CaseView
         last_error=case.last_error
         if not case.operation or active
         else "The previous analysis was interrupted. Retry the operation.",
-        task=TaskView(
-            id=task.id,
-            created_at=task.created_at,
-            status="resolved" if outcome else "open",
-            recommendation=task.recommendation,
-            resolved_at=outcome.resolved_at if outcome else None,
-            outcome_notes=outcome.notes if outcome else None,
-        )
-        if task
-        else None,
+        task=task_view(task, outcome) if task else None,
     )
 
 

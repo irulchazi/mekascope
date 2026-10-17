@@ -18,6 +18,9 @@ Never fabricate checked manuals, service records, compatibility measurements, or
 Unknown details must remain unknown. Confidence values are uncalibrated estimates, not guarantees.
 Return recognized=false if no bicycle component is sufficiently visible. Use null for unknown models.
 For scan annotations use [ymin,xmin,ymax,xmax] coordinates normalized to 0..1000.
+Include every sufficiently visible bicycle component in the scan annotations, with a short description
+for each explaining its function and any visible details. Do not restrict the list to the primary
+symptom-related component. Do not claim wear, damage, an exact model, or normal operation without evidence.
 Investigation must rank hypotheses by confidence and provide 1..6 simple checks a person can perform.
 Checks should request observable findings; do not tell a user to ride an unsafe bike or work on moving equipment.
 Verification uses only submitted evidence. A completed checkbox means a check was performed, not that a
