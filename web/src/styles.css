@@ -373,7 +373,9 @@ h2, h3, h4 { font-weight: 650; }
 .data-card > div:not(.section-label) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--teal); }
 .data-card > div:not(.section-label) span { display: inline-flex; align-items: center; gap: 8px; color: #bbceca; font-size: 0.875rem; }
 .data-card > small { color: var(--muted-2); font-size: 0.75rem; line-height: 1.35; margin-top: 2px; }
-.new-case-button { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 16px; padding: 10px 12px; border: 1px dashed #34494d; border-radius: 10px; color: #8ea5a7; background: transparent; font-size: 0.875rem; font-weight: 600; transition: color .2s, border-color .2s, background .2s; }
+.new-case-button { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; margin-top: 16px; padding: 10px 12px; border: 1px solid #2a3d41; border-radius: 10px; color: #8ea5a7; background: transparent; font-size: 0.875rem; font-weight: 600; transition: color .2s, border-color .2s, background .2s; }
+.new-case-button { position: relative; margin-top: 26px; }
+.new-case-button::before { content: ''; position: absolute; left: 0; right: 0; top: -13px; height: 1px; background: #243439; }
 .new-case-button:hover:not(:disabled) { color: var(--text); border-color: #4d6a6e; background: #0f1a1c; }
 .page-footer { display: flex; justify-content: space-between; gap: 15px; border-top: 1px solid var(--line-soft); margin-top: 32px; padding-top: 16px; color: #53696c; font: 600 0.75rem/1.4 var(--mono); letter-spacing: .05em; }
 
