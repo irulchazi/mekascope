@@ -628,16 +628,12 @@ a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .maintenance-workspace { grid-template-columns: 220px minmax(0, 1fr); }
 .maintenance-sidebar { padding-top: 34px; grid-row: 1 / -1; }
 .maintenance-sidebar > .stage-button { margin-bottom: 5px; }
-.maintenance-sidebar-note { display: grid; gap: 14px; margin: 32px 12px; padding-top: 24px; border-top: 1px solid var(--line); }
-.maintenance-sidebar-note > svg { color: var(--teal); }
-.maintenance-sidebar-note .section-kicker { font-size: 0.75rem; line-height: 1.5; }
-.maintenance-sidebar-note p { margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 .maintenance-workload { display: grid; gap: 9px; padding: 0 12px; }
 .maintenance-workload strong { font-size: 2.8125rem; font-weight: 600; letter-spacing: -.06em; }
 .maintenance-workload small { color: var(--muted); font-size: 0.875rem; }
 .maintenance-main { padding: 28px 32px; }
 .maintenance-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.maintenance-heading .page-heading { min-width: 0; max-width: 100%; padding: 35px 0 29px; }
+.maintenance-heading .page-heading { min-width: 0; max-width: 100%; }
 .maintenance-heading h1 { font-size: clamp(2.25rem, 3.36vw, 3.0625rem); margin-bottom: 9px; }
 .maintenance-heading-dot { color: var(--teal); }
 .maintenance-board-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); min-height: 49px; }
@@ -664,16 +660,14 @@ a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .kanban-column { min-width: 0; padding: 16px 12px; border: 1px solid #213135; border-radius: 11px; background: rgba(14, 24, 27, .85); transition: border-color .15s, background .15s; }
 .kanban-column.is-drop-target { border-color: var(--teal); background: #132c2b; }
 .kanban-column-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 0 3px; }
-.kanban-column-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; color: #c4d3d0; font-size: 1rem; font-weight: 700; }
+.kanban-column-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; color: #c4d3d0; font-size: 0.9375rem; font-weight: 600; }
 .kanban-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #91a6ac; }
-.kanban-column--in_progress .kanban-status-dot { background: var(--amber); box-shadow: 0 0 10px #e9b36f25; }
+.kanban-column--in_progress .kanban-status-dot { background: var(--amber); }
 .kanban-column--done .kanban-status-dot { background: var(--teal); }
 .kanban-column--done .kanban-column-heading > svg { color: #5c9c8b; }
 .kanban-count { display: grid; place-items: center; min-width: 1.5em; min-height: 24px; padding: 2px 6px; border: 1px solid #2d4144; border-radius: 5px; color: var(--muted); font: 0.875rem/1.4 var(--mono); }
-.kanban-column-mark { color: #496166; font: 0.875rem var(--mono); }
-.kanban-column-description { padding: 0 3px; margin: 9px 0 19px; color: var(--muted-2); font-size: 0.875rem; }
-.kanban-cards { display: grid; gap: 12px; }
-.maintenance-task { min-width: 0; padding: 15px; border: 1px solid #2b3e42; border-radius: 9px; background: linear-gradient(135deg, #162529, #111e21); box-shadow: 0 5px 12px #02080920; }
+.kanban-cards { display: grid; gap: 12px; margin-top: 16px; }
+.maintenance-task { min-width: 0; padding: 15px; border: 1px solid #2b3e42; border-radius: 9px; background: #131f22; }
 .maintenance-task[draggable=true] { cursor: grab; }
 .maintenance-task[draggable=true]:active { cursor: grabbing; }
 .maintenance-task:hover { border-color: #47706c; }
@@ -685,12 +679,12 @@ a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
 .priority-tag--high { color: #f0b892; background: #352722; border-color: #634635; }
 .priority-tag--medium { color: #e9ce91; background: #302c20; border-color: #514a31; }
 .priority-tag--low { color: #9ed1c1; background: #1b312b; border-color: #345447; }
-.maintenance-task-title { display: block; width: 100%; padding: 0; margin: 0 0 17px; text-align: left; color: var(--text); background: none; border: 0; font-size: 1.125rem; line-height: 1.5; font-weight: 650; overflow-wrap: anywhere; }
+.maintenance-task-title { width: 100%; padding: 0; margin: 0 0 12px; text-align: left; color: var(--text); background: none; border: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .maintenance-task-title:hover { color: var(--teal); }
-.maintenance-task-equipment { display: flex; align-items: center; gap: 7px; color: #a4bbb6; font-size: 0.875rem; line-height: 1.5; }
+.maintenance-task-equipment { display: flex; align-items: center; gap: 7px; color: #a4bbb6; font-size: 0.8125rem; line-height: 1.5; }
 .maintenance-task-equipment svg { flex-shrink: 0; color: #638d86; }
 .maintenance-task-equipment span { overflow-wrap: anywhere; }
-.maintenance-task-diagnosis { margin: 8px 0 17px; color: var(--muted-2); font-size: 0.9375rem; line-height: 1.5; overflow-wrap: anywhere; }
+.maintenance-task-diagnosis { margin: 8px 0 16px; color: var(--muted-2); font-size: 0.8125rem; line-height: 1.55; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .maintenance-task-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #2a3b3f; padding-top: 12px; color: var(--muted-2); font: 0.75rem var(--mono); }
 .maintenance-task-footer > span { display: flex; align-items: center; gap: 5px; }
 .maintenance-task-footer .maintenance-done-label { color: var(--teal); }
@@ -740,7 +734,7 @@ a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
   .maintenance-sidebar { display: flex; flex-direction: row; gap: 8px; padding: 12px 16px; }
   .maintenance-sidebar > .stage-button { flex: 1; flex-direction: row; min-height: 44px; gap: 10px; margin: 0; }
   .maintenance-sidebar .stage-text b { font-size: 0.9375rem; }
-  .maintenance-sidebar .sidebar-lower, .maintenance-sidebar-note { display: none; }
+  .maintenance-sidebar .sidebar-lower { display: none; }
   .maintenance-main { padding: 20px 16px; }
   .maintenance-heading { flex-direction: column; gap: 0; padding-bottom: 22px; }
   .maintenance-heading .page-heading { padding: 25px 0 18px; }
