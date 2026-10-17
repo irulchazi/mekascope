@@ -4,6 +4,38 @@ A human-reviewed bicycle diagnosis workflow powered by FastAPI, PostgreSQL, and 
 
 ## Local setup
 
+### Docker Compose
+
+Requirements: Docker with Compose v2.24+ and a Gemini API key for image analysis.
+
+From the repository root, create the backend environment file if you do not already have one:
+
+```bash
+cp app/.env.example app/.env
+```
+
+Set `GEMINI_API_KEY` in `app/.env`, then build and start the frontend, backend, and PostgreSQL together:
+
+```bash
+docker compose up --build
+```
+
+Open `http://127.0.0.1:5173`. API documentation is at `http://127.0.0.1:8000/docs`. For detached startup that waits for all services to become healthy, use `docker compose up --build -d --wait`.
+
+The backend waits for PostgreSQL and applies Alembic migrations before serving requests. The frontend waits for the backend's database readiness check and proxies `/api` to `http://backend:8000` on the Compose network. Compose overrides `DATABASE_URL` from `app/.env` with the internal database address; the file's loopback address still works for running the backend on your host. The environment file is optional for catalogue and saved-case access, and is excluded from Docker images.
+
+These containers run the local app with Vite serving the frontend. Source code is copied into the images; rerun `docker compose up --build` after changing code or dependencies. No host Python, uv, Node, or npm installation is needed for this setup.
+
+To stop the stack and remove its containers while keeping saved cases:
+
+```bash
+docker compose down
+```
+
+The existing `postgres_data` volume is retained. Avoid `docker compose down -v` unless you intend to delete the database. If you are already running the frontend or backend on your host, stop those processes before starting the full stack so ports 5173 and 8000 are available.
+
+### Host development
+
 Requirements: uv, Python 3.11+, Node 20.19+ (or Node 22.12+), Docker Compose, and a Gemini API key. The project was verified with Python 3.14 and Node 26.
 
 From the repository root:
@@ -42,7 +74,7 @@ curl --fail http://127.0.0.1:8000/health
 curl --fail http://127.0.0.1:8000/health/ready
 ```
 
-`/health` reports process liveness. `/health/ready` checks the migrated database; it does not make a paid Gemini request. The catalogue and saved cases remain accessible without a Gemini key; analysis returns an actionable configuration error until a key is configured. PostgreSQL is required for case operations. The Compose database listens on loopback port 5433 and persists data in a named volume. `docker compose stop` preserves that volume.
+`/health` reports process liveness. `/health/ready` checks the database migration revision against the deployed code and returns 503 with the migration command when they differ; it does not make a paid Gemini request. The catalogue and saved cases remain accessible without a Gemini key; analysis returns an actionable configuration error until a key is configured. PostgreSQL is required for case operations. The Compose database listens on loopback port 5433 and persists data in a named volume. `docker compose stop` preserves that volume.
 
 ## Workflow and API
 
@@ -51,6 +83,10 @@ Application routes use `/api/v1`; the complete request and response schemas are 
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/catalog` | Sample bicycle input context and static pump preview |
+| GET / POST | `/equipment` | List or create saved equipment profiles |
+| PUT | `/equipment/{id}` | Update equipment identity and configuration |
+| GET / POST | `/service-records` | List or log dated service entries; filter with `equipment_id` |
+| PUT | `/service-records/{id}` | Edit a service entry and its equipment link |
 | POST | `/images/preview` | Convert a photo to a JPEG preview without saving a case |
 | POST | `/cases` | Create a case using multipart input |
 | GET | `/cases/{id}` | Restore results, evidence, available stages, and task |
@@ -81,6 +117,18 @@ Browser session storage holds only the active case ID and selected stage. Postgr
 The **Maintenance board** at `/maintenance` lists approved tasks across inspections. **Approve & create task** in the Act step adds one card to **To do**, with a link to open the board. Existing approved tasks appear automatically. Drag cards or use their status menu to move work through **To do**, **In progress**, and **Done**. Search by task ID, equipment, symptom, or diagnosis, and filter by priority. Open a card for the recommendation, resolution notes, and a link back to its source inspection. Moving a task to **Done** records its resolution on the inspection; resolving it from Act also moves its board card to **Done**. Completed outcomes are final, and retrying completion preserves the original notes. The board persists in PostgreSQL and does not require an active inspection in browser storage.
 
 After updating an existing installation, run `uv run --project app --locked python -m alembic -c app/alembic.ini upgrade head` to add board statuses. Existing open tasks start in **To do**, and tasks with recorded outcomes start in **Done**. Production frontend hosting must serve the SPA entry point for `/maintenance` as well as `/`.
+
+The Act step also offers **Skip, self-resolved**, which records a user-reported resolution without creating a task. Migration `0006` adds the case's self-resolution timestamp. Host development requires the migration command above after pulling this change; an older schema causes case access and **Approve & create task** to return 503. Compose applies it automatically when starting a rebuilt backend. Applying the migration preserves saved inspections, verification results, and tasks.
+
+The **Equipment configuration** page at `/equipment` saves equipment names, manufacturer/model, serial or asset numbers, and configuration notes. The **Service history** page at `/service-history` logs dated work against an equipment profile, with service type, technician, and observations. Both pages support editing, searching, and reloads, and are available from the workspace navigation. Service history also filters by equipment and service type. Unknown fields remain blank until supplied.
+
+Migration `0004` seeds **Road bike** (Element FRC 50 CRD, asset `2026/07/07-ELE-CRD`) with the supplied 2x10-speed drivetrain configuration. Docker applies it automatically on backend startup, so a fresh database or a database recreated after removing the volume includes the default equipment. Restarts and rebuilds retain the saved profile. The migration checks the fixed seed ID and asset number to avoid duplicates, preserves an existing matching profile and its service history, and leaves later edits intact. For host development, the usual `alembic upgrade head` command installs the seed.
+
+Migration `0005` adds **RD adjuster**, a maintenance entry for Road bike dated **17 August 2026**, performed by **Bike Technician**, with the notes **Adjust the RD for better gear shifting.** It links to the actual Road bike profile even if `0004` reused an existing asset. Fresh databases receive both records, while repeated migrations preserve existing entries and edits without adding duplicates.
+
+Choose **Inspect equipment** on a profile, or select **Saved equipment** when uploading a bicycle photo, to attach the saved configuration and recent service history to a new case. The API accepts the optional multipart `equipment_id` for uploaded cases. It snapshots the profile and up to 20 most recent service records at case creation, with configuration and history each bounded to 4,000 characters. Later record edits apply to future inspections; existing case context remains unchanged. The prepared sample bicycle keeps its own sample context. Additional service entries are entered manually; maintenance board resolutions stay attached to their source inspections.
+
+Run `uv run --project app --locked python -m alembic -c app/alembic.ini upgrade head` to add the equipment and service tables to an existing host installation. Compose applies this migration on backend startup. Production frontend hosting must also serve the SPA entry point for `/equipment` and `/service-history`.
 
 ## Verification
 
@@ -121,6 +169,7 @@ Commit both `app/pyproject.toml` and `app/uv.lock` when dependencies change. Run
 
 - `app/`: FastAPI entrypoint, Pydantic schemas, async database models, Gemini adapter, workflow services, catalogue, migrations, and tests.
 - `web/`: React/TypeScript frontend, typed API client, Vite configuration, Playwright tests, and bundled sample photographs.
-- `compose.yaml`: persistent local PostgreSQL service.
+- `compose.yaml`: local frontend, backend with automatic migrations, and persistent PostgreSQL services.
+- `app/Dockerfile`, `web/Dockerfile`: backend and frontend container builds using the committed dependency lockfiles.
 
 This is a trusted prototype without login or per-user access restrictions. Service tasks are internal database records and resolutions are user reports. Camera capture, voice input, external maintenance systems, and automated retrieval from case memory are not included. The two bundled photographs were generated for this prototype.

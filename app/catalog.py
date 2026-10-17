@@ -3,11 +3,11 @@
 from app.config import ROOT
 
 SAMPLE_IMAGE = ROOT / "web/public/images/bicycle-drivetrain.jpg"
-SAMPLE_SYMPTOM = "I hear clicking whenever I use the fourth and fifth gears."
+SAMPLE_SYMPTOM = "I have a hard time shifting from 3rd to 2nd gear, and usually like to jump straight to 1st gear."
 SAMPLE_CONTEXT = {
     "source": "sample",
     "asset_id": "BL-001",
-    "name": "Element FRC 50 CRD",
+    "name": "Road bike",
     "configuration": "Road bicycle; 12-speed drivetrain; Shimano 105 RD-R7100 rear derailleur; 105 FC-R7100 crankset; 11–34T cassette; CN-M7100 chain.",
     "service": "Prepared history: last drivetrain service 3,400 km ago; chain mileage approximately 1,200 km; rear derailleur recently removed.",
 }
