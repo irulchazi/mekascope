@@ -25,7 +25,7 @@ const componentFunctions: [RegExp, string][] = [
   [/saddle|seatpost/i, 'Part of the seating assembly that supports the rider’s seated position.'],
 ]
 
-function describeComponent(annotation: Annotation) {
+export function describeComponent(annotation: Annotation) {
   return annotation.description?.trim() || componentFunctions.find(([pattern]) => pattern.test(annotation.label))?.[1]
     || 'Identified in the inspection photo. No further component detail was saved with this scan.'
 }

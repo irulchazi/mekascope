@@ -1,4 +1,35 @@
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    init: true
+    mem_limit: 1g
+    env_file:
+      - path: app/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://mekascope:mekascope@db:5432/mekascope
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    init: true
+    mem_limit: 512m
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+
   db:
     image: postgres:17
     environment:

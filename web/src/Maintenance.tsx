@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { Aperture, ArrowRight, Check, CircleCheck, ClipboardCheck, Clock3, Columns3, Gauge, GripVertical, Info, RefreshCw, ScanLine, Search, X } from 'lucide-react'
-import { api, type BoardStatus, type MaintenanceTask } from './api'
+import { api, type BoardStatus, type MaintenanceTask, type Priority } from './api'
+import WorkspaceLinks from './WorkspaceLinks'
 
 const columns: { id: BoardStatus; label: string; description: string }[] = [
   { id: 'todo', label: 'To do', description: 'Approved and ready to schedule' },
@@ -11,7 +12,7 @@ const taskKey = (id: number) => `MT-${String(id).padStart(4, '0')}`
 const inspectionLink = (task: MaintenanceTask) => `/?case=${encodeURIComponent(task.case_id)}&stage=act`
 const createdDate = (date: string) => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(date))
 
-function TaskDetails({ task, busy, error, close, move }: { task: MaintenanceTask; busy: boolean; error: string; close: () => void; move: (id: number, status: BoardStatus, notes?: string) => Promise<void> }) {
+function TaskDetails({ task, busy, error, close, move, changePriority }: { task: MaintenanceTask; busy: boolean; error: string; close: () => void; move: (id: number, status: BoardStatus, notes?: string) => Promise<void>; changePriority: (id: number, priority: Priority) => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [notes, setNotes] = useState('')
   useEffect(() => {
@@ -25,7 +26,9 @@ function TaskDetails({ task, busy, error, close, move }: { task: MaintenanceTask
   return <dialog ref={dialog} className="maintenance-dialog" aria-labelledby="task-detail-title" onClose={close}>
     <div className="maintenance-dialog-header"><span className="section-kicker"><ClipboardCheck size={15} /> {taskKey(task.id)} / MAINTENANCE</span><button className="icon-button" aria-label="Close task details" onClick={close}><X size={19} /></button></div>
     <h2 id="task-detail-title">{task.recommendation.action}</h2>
-    <div className="maintenance-detail-tags"><span className={`priority-tag priority-tag--${task.recommendation.severity}`}>{task.recommendation.severity === 'unknown' ? 'Priority unassessed' : `${task.recommendation.severity} priority`}</span><span className={`board-status board-status--${task.board_status}`}>{columns.find(column => column.id === task.board_status)?.label}</span></div>
+    <div className="maintenance-detail-tags"><select className={`priority-tag priority-editor priority-tag--${task.priority}`} aria-label="Task priority" title="Change priority" value={task.priority} disabled={busy} onChange={event => void changePriority(task.id, event.target.value as Priority)}>
+      <option value="low">Low priority</option><option value="medium">Medium priority</option><option value="high">High priority</option><option value="unknown">Unknown</option>
+    </select><span className={`board-status board-status--${task.board_status}`}>{columns.find(column => column.id === task.board_status)?.label}</span></div>
     {error && <div className="error-banner" role="alert"><Info size={17} /> {error}</div>}
     <dl className="maintenance-detail-facts"><div><dt>Equipment</dt><dd>{task.equipment}</dd></div><div><dt>Component</dt><dd>{task.component || 'Not identified'}</dd></div><div><dt>Approved</dt><dd>{createdDate(task.created_at)}</dd></div><div><dt>Diagnosis</dt><dd>{task.recommendation.diagnosis}</dd></div></dl>
     <div className="maintenance-detail-copy"><h3>Reported symptom</h3><p>{task.symptom}</p><h3>Assessment</h3><p>{task.recommendation.summary}</p><h3>Verify the fix</h3><p>{task.recommendation.verification}</p><h3>Expected result</h3><p>{task.recommendation.expected}</p></div>
@@ -69,6 +72,18 @@ export default function Maintenance() {
     } finally { setUpdatingId(null); setDropStatus(null) }
   }
 
+  async function changePriority(id: number, priority: Priority) {
+    if (updatingId !== null || loading) return
+    setUpdatingId(id); setError(''); setAnnouncement('')
+    try {
+      const updated = await api.setTaskPriority(id, priority)
+      setTasks(current => current.map(task => task.id === id ? updated : task))
+      setAnnouncement(`${taskKey(id)} priority changed to ${priority}.`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update this priority. Please retry.')
+    } finally { setUpdatingId(null) }
+  }
+
   function startDrag(event: DragEvent<HTMLElement>) {
     event.dataTransfer.setData('application/x-mekascope-task', event.currentTarget.dataset.taskId || '')
     event.dataTransfer.effectAllowed = 'move'
@@ -89,7 +104,7 @@ export default function Maintenance() {
   }
 
   const query = search.trim().toLowerCase()
-  const filtered = tasks.filter(task => (priority === 'all' || task.recommendation.severity === priority) && (!query || [taskKey(task.id), task.equipment, task.component, task.symptom, task.recommendation.action, task.recommendation.diagnosis].filter(Boolean).join(' ').toLowerCase().includes(query)))
+  const filtered = tasks.filter(task => (priority === 'all' || task.priority === priority) && (!query || [taskKey(task.id), task.equipment, task.component, task.symptom, task.recommendation.action, task.recommendation.diagnosis].filter(Boolean).join(' ').toLowerCase().includes(query)))
   const selected = tasks.find(task => task.id === selectedId)
   const activeCount = tasks.filter(task => task.board_status !== 'done').length
   const busy = loading || updatingId !== null
@@ -97,23 +112,23 @@ export default function Maintenance() {
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" aria-label="MekaScope, inspection"><span className="brand-mark"><Aperture size={24} /></span><span className="brand-name">meka<span>scope</span><small>MECHANICAL INTELLIGENCE</small></span></a><div className="topbar-right"><span className="topbar-edition">MAINTENANCE WORKSPACE</span><span className="simulation-badge"><span className="badge-dot" /> HUMAN-APPROVED WORK</span></div></header>
     <div className="workspace maintenance-workspace">
-      <nav className="sidebar maintenance-sidebar" aria-label="Workspace"><div className="sidebar-heading">THE WORKSPACE <span>02</span></div><a href="/" data-tip="Observe to action" className="stage-button"><span className="stage-icon"><ScanLine size={18} /></span><span className="stage-text"><b>Inspection</b></span><ArrowRight className="stage-status" size={15} /></a><a href="/maintenance" data-tip="Plan and track the work" className="stage-button is-active" aria-current="page"><span className="stage-icon"><Columns3 size={18} /></span><span className="stage-text"><b>Maintenance</b></span></a><div className="sidebar-lower"><div className="maintenance-workload"><span className="section-kicker">OPEN WORK</span><strong>{loading ? '—' : activeCount.toString().padStart(2, '0')}</strong><small>tasks awaiting resolution</small></div><div className="sidebar-foot"><span className="mini-pulse" /> HUMAN-REVIEWED WORKFLOW</div></div></nav>
+      <nav className="sidebar maintenance-sidebar" aria-label="Workspace"><div className="sidebar-heading">THE WORKSPACE <span>04</span></div><WorkspaceLinks active="/maintenance" /><div className="sidebar-lower"><div className="maintenance-workload"><span className="section-kicker">OPEN WORK</span><strong>{loading ? '—' : activeCount.toString().padStart(2, '0')}</strong><small>tasks awaiting resolution</small></div><div className="sidebar-foot"><span className="mini-pulse" /> HUMAN-REVIEWED WORKFLOW</div></div></nav>
       <main className="main-content maintenance-main" aria-busy={busy}>
         <div className="main-topline"><span>WORKSPACE / MAINTENANCE</span><span>OPERATIONS BOARD</span></div>
-        <div className="maintenance-heading"><div className="page-heading"><div className="eyebrow"><span className="eyebrow-line" /> APPROVED WORK / KANBAN</div><h1>Maintenance<span className="maintenance-heading-dot">.</span></h1><p>Turn approved inspections into completed work.</p></div><a href="/" className="secondary-button compact"><ScanLine size={15} /> Open inspection <ArrowRight size={15} /></a></div>
+        <div className="maintenance-heading"><div className="page-heading"><div className="eyebrow"><span className="eyebrow-line" /> APPROVED WORK / KANBAN</div><h1>Maintenance<span className="maintenance-heading-dot">.</span></h1><p>Turn approved inspections into completed work.</p></div><a href="/?new=1" className="secondary-button compact"><ScanLine size={15} /> Open inspection <ArrowRight size={15} /></a></div>
         <div className="maintenance-board-bar"><span><Columns3 size={17} /> Board</span><div><span>{tasks.length} total</span><span className="maintenance-bar-divider" /><span><Clock3 size={13} /> {tasks.filter(task => task.board_status === 'in_progress').length} in progress</span></div></div>
         <div className="maintenance-toolbar"><label className="maintenance-search"><Search size={17} /><input type="search" aria-label="Search maintenance tasks" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search tasks, equipment, or diagnosis…" /></label><label className="maintenance-priority"><span>Priority</span><select aria-label="Filter by priority" value={priority} onChange={event => setPriority(event.target.value)}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="unknown">Unassessed</option></select></label><button className="icon-button maintenance-refresh" aria-label="Refresh maintenance tasks" disabled={busy} onClick={() => setReload(value => value + 1)}><RefreshCw size={17} /></button></div>
         {error && !selected && <div className="error-banner" role="alert"><Info size={18} /><span>{error}</span><button className="secondary-button compact" disabled={busy} onClick={() => setReload(value => value + 1)}>Retry</button></div>}
         {(query || priority !== 'all') && <div className="maintenance-board-hint"><span>{filtered.length} {filtered.length === 1 ? 'task' : 'tasks'} matching filters</span></div>}
         <div className="maintenance-announcement" role="status" aria-live="polite">{announcement}</div>
-        {!loading && !error && tasks.length === 0 && <div className="maintenance-empty"><ClipboardCheck size={27} /><div><h2>Your next action starts with an inspection.</h2><p>Choose Approve &amp; create task in the Act step to add your first maintenance task.</p></div><a href="/" className="text-button">Start an inspection <ArrowRight size={16} /></a></div>}
+        {!loading && !error && tasks.length === 0 && <div className="maintenance-empty"><ClipboardCheck size={27} /><div><h2>Your next action starts with an inspection.</h2><p>Choose Approve &amp; create task in the Act step to add your first maintenance task.</p></div><a href="/?new=1" className="text-button">Start an inspection <ArrowRight size={16} /></a></div>}
         <div className="kanban-scroll"><div className="kanban-board" aria-label="Maintenance Kanban board">
           {columns.map(column => {
             const cards = filtered.filter(task => task.board_status === column.id)
             return <section key={column.id} className={`kanban-column kanban-column--${column.id} ${dropStatus === column.id ? 'is-drop-target' : ''}`} aria-labelledby={`column-${column.id}`} data-status={column.id} onDragOver={dragOver} onDrop={drop}>
               <div className="kanban-column-heading"><h2 id={`column-${column.id}`}><span className="kanban-status-dot" />{column.label}<span className="kanban-count">{cards.length}</span></h2>{column.id === 'done' && <CircleCheck size={16} />}</div>
               <div className="kanban-cards">{cards.map(task => <article key={task.id} className={`maintenance-task ${updatingId === task.id ? 'is-saving' : ''}`} aria-label={`${taskKey(task.id)}: ${task.recommendation.action}`} data-task-id={task.id} draggable={!busy && task.board_status !== 'done'} onDragStart={startDrag} onDragEnd={() => setDropStatus(null)}>
-                <div className="maintenance-task-top"><span className="maintenance-task-key"><ClipboardCheck size={13} />{taskKey(task.id)}</span><span className={`priority-tag priority-tag--${task.recommendation.severity}`}>{task.recommendation.severity === 'unknown' ? 'Unassessed' : task.recommendation.severity}</span></div>
+                <div className="maintenance-task-top"><span className="maintenance-task-key"><ClipboardCheck size={13} />{taskKey(task.id)}</span><span className={`priority-tag priority-tag--${task.priority}`}>{task.priority === 'unknown' ? 'Unassessed' : task.priority}</span></div>
                 <button className="maintenance-task-title" onClick={() => { setSelectedId(task.id); setError('') }}>{task.recommendation.action}</button>
                 <div className="maintenance-task-equipment"><Gauge size={14} /><span>{task.equipment}</span></div><p className="maintenance-task-diagnosis">{task.recommendation.diagnosis}</p>
                 <div className="maintenance-task-footer"><span><Clock3 size={12} />{createdDate(task.created_at)}</span>{task.board_status === 'done' ? <span className="maintenance-done-label"><Check size={13} /> Resolved</span> : <GripVertical size={15} className="maintenance-drag-handle" />}</div>
@@ -125,6 +140,6 @@ export default function Maintenance() {
         <footer className="page-footer"><span>MEKASCOPE / MAINTENANCE</span><span>Inspection → Approval → Resolution</span></footer>
       </main>
     </div>
-    {selected && <TaskDetails key={selected.id} task={selected} busy={busy} error={error} close={() => setSelectedId(null)} move={move} />}
+    {selected && <TaskDetails key={selected.id} task={selected} busy={busy} error={error} close={() => setSelectedId(null)} move={move} changePriority={changePriority} />}
   </div>
 }

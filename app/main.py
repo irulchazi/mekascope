@@ -2,6 +2,8 @@
 
 from contextlib import asynccontextmanager
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -10,7 +12,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.ai import DiagnosisProvider, GeminiProvider
-from app.config import Settings
+from app.config import ROOT, Settings
 from app.database import create_database
 from app.routers import router
 
@@ -54,6 +56,9 @@ def create_app(
     settings: Settings | None = None, provider: DiagnosisProvider | None = None
 ) -> FastAPI:
     settings = settings or Settings()
+    migration_heads = set(
+        ScriptDirectory.from_config(Config(str(ROOT / "app/alembic.ini"))).get_heads()
+    )
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -104,7 +109,20 @@ def create_app(
     @application.get("/health/ready", tags=["service"])
     async def readiness() -> dict[str, str]:
         async with application.state.engine.connect() as connection:
-            await connection.execute(text("SELECT 1 FROM cases LIMIT 1"))
+            revisions = set(
+                (
+                    await connection.execute(
+                        text("SELECT version_num FROM alembic_version")
+                    )
+                ).scalars()
+            )
+        if revisions != migration_heads:
+            raise HTTPException(
+                503,
+                "Database migrations are pending. Run "
+                "'uv run --project app --locked python -m alembic "
+                "-c app/alembic.ini upgrade head', then retry.",
+            )
         return {"status": "ok"}
 
     return application
