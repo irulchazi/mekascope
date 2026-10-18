@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Activity, Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bike, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, History, Info, LockKeyhole, Maximize2, PackageCheck, RotateCcw, ScanLine, Sparkles, Wrench } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { Activity, Aperture, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Bike, BookOpen, Boxes, Camera, Check, CircleCheck, ClipboardCheck, Clock3, Crosshair, Factory, History, Info, LockKeyhole, Maximize2, Moon, PackageCheck, RotateCcw, ScanLine, Sparkles, Sun, Upload, Wrench } from 'lucide-react'
 import { api, ApiError, imageUrl, type Annotation, type Case, type Catalog, type Equipment, type Pump, type Step } from './api'
 import { stages, type BikeStage, type Stage } from './data'
 import PhotoViewer from './PhotoViewer'
@@ -50,9 +50,10 @@ function Frame({ src, annotations = [], pending = false, preview = false, fitted
     {zoomable && <button type="button" className="photo-expand" aria-label="Enlarge inspection photo" onClick={() => setViewerOpen(true)}><span><Maximize2 size={16} /> Enlarge photo</span></button>}
   </div>{showComponents && annotations.length > 0 && <figcaption><PhotoComponents annotations={annotations} selectedAnnotation={selectedAnnotation} selectAnnotation={selectAnnotation} /></figcaption>}{viewerOpen && <PhotoViewer src={imageUrl(src)} annotations={annotations} selectedAnnotation={selectedAnnotation} selectAnnotation={selectAnnotation} close={() => setViewerOpen(false)} />}</figure>
 }
-function PhotoPicker({ label, photo, required = false, disabled = false, onChange }: { label: string; photo: File | null; required?: boolean; disabled?: boolean; onChange: (photo: File | null) => void }) {
+function PhotoPicker({ label, photo, required = false, disabled = false, onChange, action }: { action?: ReactNode; label: string; photo: File | null; required?: boolean; disabled?: boolean; onChange: (photo: File | null) => void }) {
   const uploadInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
+  const inputId = useId()
   useEffect(() => {
     if (!photo) {
       if (uploadInput.current) uploadInput.current.value = ''
@@ -60,8 +61,9 @@ function PhotoPicker({ label, photo, required = false, disabled = false, onChang
     }
   }, [photo])
   return <div className="photo-picker">
-    <label>{label}<input ref={uploadInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" required={required && !photo} disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} /></label>
-    <div className="photo-picker-actions"><button type="button" className="secondary-button" disabled={disabled} onClick={() => cameraInput.current?.click()}><Camera size={16} /> Take photo</button><small>{photo ? photo.name : 'JPEG, PNG, WebP, or HEIC/HEIF · up to 10 MiB'}</small></div>
+    <label htmlFor={inputId}>{label}</label>
+    <input id={inputId} ref={uploadInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" required={required && !photo} disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} />
+    <div className="photo-picker-actions"><button type="button" className="secondary-button compact" disabled={disabled} onClick={() => uploadInput.current?.click()}><Upload size={15} /> Choose file</button><button type="button" className="secondary-button compact" disabled={disabled} onClick={() => cameraInput.current?.click()}><Camera size={15} /> Take photo</button>{photo ? <small>{photo.name}</small> : <span className="info-tip" tabIndex={0} data-tip="JPEG, PNG, WebP, or HEIC/HEIF · up to 10 MiB"><Info size={14} /></span>}{action && <span className="photo-picker-submit">{action}</span>}</div>
     <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden disabled={disabled} onChange={e => onChange(e.target.files?.[0] || null)} />
   </div>
 }
@@ -86,11 +88,21 @@ function StepForm({ step, disabled, save, onObservationChange }: { step: Step; d
     <span className="verify-step-index">{step.completed ? <Check size={15} /> : <Crosshair size={15} />}</span>
     <div className="step-fields"><strong>{step.title}</strong><p>{step.instruction}</p>
       <label>Observations Notes (optional)<textarea aria-label={`Observations: ${step.title}`} maxLength={4000} value={observation} onChange={e => { setObservation(e.target.value); onObservationChange(e.target.value) }} onBlur={() => void saveCompletedObservation()} disabled={disabled} />{step.completed && <small>Changes save when you leave this field.</small>}</label>
-      <PhotoPicker label="Follow-up photo (optional)" photo={photo} disabled={locked} onChange={setPhoto} />
+      <PhotoPicker label="Follow-up photo (optional)" photo={photo} disabled={locked} onChange={setPhoto} action={<button className="secondary-button compact" disabled={locked}>{step.completed ? 'Done' : 'Confirm check completed'} <Check size={15} /></button>} />
       {step.image_url && <a href={imageUrl(step.image_url)} target="_blank" rel="noreferrer">View saved evidence photo</a>}
-      <button className="secondary-button" disabled={locked}>{step.completed ? 'Done' : 'Confirm check completed'} <Check size={15} /></button>
     </div>
   </form>
+}
+function StepsPanel({ steps, disabled, save, onObservationChange }: { steps: Step[]; disabled: boolean; save: (step: Step, body: FormData) => Promise<boolean>; onObservationChange: (step: Step, observation: string) => void }) {
+  const [index, setIndex] = useState(() => Math.max(0, steps.findIndex(step => !step.completed)))
+  return <div className="panel verify-steps">
+    <Label end={<span className="section-hint">STEP {index + 1} OF {steps.length}</span>}>INSPECTION STEPS</Label>
+    {steps.map((step, i) => <div key={step.id} hidden={i !== index}><StepForm step={step} disabled={disabled} onObservationChange={observation => onObservationChange(step, observation)} save={body => save(step, body)} /></div>)}
+    <div className="step-nav">
+      <button type="button" className="secondary-button compact" disabled={index === 0} onClick={() => setIndex(index - 1)}><ArrowLeft size={15} /> Previous</button>
+      <button type="button" className="secondary-button compact" disabled={index === steps.length - 1} onClick={() => setIndex(index + 1)}>Next <ArrowRight size={15} /></button>
+    </div>
+  </div>
 }
 function PumpPreview({ pump, back }: { pump: Pump; back: () => void }) {
   return <>
@@ -101,6 +113,17 @@ function PumpPreview({ pump, back }: { pump: Pump; back: () => void }) {
     <div className="translation-card"><div><span className="section-kicker">ONE EQUIPMENT MODEL</span><h3>From bicycle to production line</h3></div><div className="translation-flow"><span>Component</span><ArrowRight size={15} /><span>Context</span><ArrowRight size={15} /><span>Evidence</span><ArrowRight size={15} /><span>Action</span></div></div>
     <button className="text-button back-to-bike" onClick={back}><ArrowLeft size={16} /> Back to bicycle case</button>
   </>
+}
+
+function ThemeToggle() {
+  const [light, setLight] = useState(() => document.documentElement.dataset.theme === 'light')
+  const toggle = () => {
+    const next = !light
+    setLight(next)
+    document.documentElement.dataset.theme = next ? 'light' : 'dark'
+    try { localStorage.setItem('theme', next ? 'light' : 'dark') } catch { /* storage unavailable */ }
+  }
+  return <button className="icon-button theme-toggle" onClick={toggle} aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'}>{light ? <Moon size={18} /> : <Sun size={18} />}</button>
 }
 
 export default function App() {
@@ -307,15 +330,15 @@ export default function App() {
 
   const equipmentProfile = <div className="context-card"><Label end={isFactory ? <span className="context-live"><span /> PREVIEW</span> : undefined}>EQUIPMENT PROFILE</Label><div className="asset-summary"><span className="asset-icon">{isFactory ? <Factory size={22} /> : <Bike size={22} />}</span><div><strong>{isFactory ? `Pump ${catalog?.pump.id || ''}` : assetName}</strong><small>{isFactory ? catalog?.pump.location : scan?.equipment || 'Bicycle inspection'}</small></div></div><div className="context-divider" /><div className="context-rows"><div><span>Component</span><strong>{isFactory ? catalog?.pump.component : scan?.component || 'Not yet identified'}</strong></div><div><span>Model</span><strong>{isFactory ? 'Static preview' : scan?.model || current?.context.model || selectedEquipment?.model || (source === 'sample' && !current ? 'FRC 50 CRD' : 'Not recorded')}</strong></div><div><span>History</span><strong>{isFactory ? 'Prepared' : '575,8 km'}</strong></div></div></div>
   const agentNote = <div className="agent-note"><div className="agent-note-icon"><Sparkles size={18} /></div><span className="section-kicker">AGENT NOTE</span><p>{note}</p><div className="note-bottom"><span className="mini-pulse" /> {isFactory ? 'STATIC INDUSTRIAL PREVIEW' : 'PERSISTED CASE WORKFLOW'}</div></div>
-  const contextAvailable = <div className="data-card"><Label>CONTEXT AVAILABLE</Label><div><span><Boxes size={15} /> Equipment photo</span>{photo && <CircleCheck size={14} />}</div><div><span><BookOpen size={15} /> Configuration</span>{hasConfigurationContext ? <CircleCheck size={14} /> : <span>Unknown</span>}</div><div><span><History size={15} /> Service history</span>{hasServiceContext ? <CircleCheck size={14} /> : <span>Unknown</span>}</div><small>Only supplied context is used in analysis.</small></div>
+  const contextAvailable = <div className="data-card"><Label end={<span className="info-tip" tabIndex={0} data-tip="Only supplied context is used in analysis."><Info size={14} /></span>}>CONTEXT AVAILABLE</Label><div><span><Boxes size={15} /> Equipment photo</span>{photo && <CircleCheck size={14} />}</div><div><span><BookOpen size={15} /> Configuration</span>{hasConfigurationContext ? <CircleCheck size={14} /> : <span>Unknown</span>}</div><div><span><History size={15} /> Service history</span>{hasServiceContext ? <CircleCheck size={14} /> : <span>Unknown</span>}</div></div>
 
   return <div className="app-shell">
-    <header className="topbar"><button className="brand" onClick={restart} disabled={busy || loading} aria-label="MekaScope, new case"><span className="brand-mark"><Aperture size={24} /></span><span className="brand-name">meka<span>scope</span><small>MECHANICAL INTELLIGENCE</small></span></button><div className="topbar-right"><span className="topbar-edition">BICYCLE INSPECTION</span><span className="simulation-badge"><span className="badge-dot" /> {isFactory ? 'STATIC PREVIEW' : 'GEMINI ANALYSIS'}</span></div></header>
+    <header className="topbar"><button className="brand" onClick={restart} disabled={busy || loading} aria-label="MekaScope, new case"><span className="brand-mark"><Aperture size={24} /></span><span className="brand-name">meka<span>scope</span><small>MECHANICAL INTELLIGENCE</small></span></button><div className="topbar-right"><ThemeToggle /><span className="topbar-edition">BICYCLE INSPECTION</span><span className="simulation-badge"><span className="badge-dot" /> {isFactory ? 'STATIC PREVIEW' : 'GEMINI ANALYSIS'}</span></div></header>
     <div className={`workspace ${stage === 'observe' ? 'workspace--observe' : ''}`}>
       <nav className="sidebar" aria-label="Inspection workflow"><div className="sidebar-heading">THE WORKFLOW <span>01—05</span></div><div className="stage-list">{stages.map((s, index) => {
         const Icon = icons[index]; const locked = s.id !== 'observe' && !current?.available_stages.includes(s.id)
-        return <button key={s.id} className={`stage-button ${stage === s.id ? 'is-active' : ''}`} disabled={locked || loading || !!pending} onClick={() => changeStage(s.id)} aria-current={stage === s.id ? 'step' : undefined}><span className="stage-icon"><Icon size={17} /></span><span className="stage-text"><b>{s.label}</b><small>{s.description}</small></span><span className="stage-status">{locked ? <LockKeyhole size={12} /> : s.number}</span></button>
-      })}</div><div className="sidebar-lower"><WorkspaceLinks compact /><div className="sidebar-heading">BEYOND THE BIKE</div><button className={`factory-link ${isFactory ? 'is-active' : ''}`} disabled={loading || !!pending} onClick={() => changeStage('factory')}><span className="factory-link-icon"><Factory size={19} /></span><span><b>Factory preview</b><small>Same intelligence, new scale</small></span><ArrowRight size={15} /></button><div className="sidebar-foot"><span className="mini-pulse" /> HUMAN-REVIEWED WORKFLOW</div></div></nav>
+        return <button key={s.id} data-tip={s.description} className={`stage-button ${stage === s.id ? 'is-active' : ''}`} disabled={locked || loading || !!pending} onClick={() => changeStage(s.id)} aria-current={stage === s.id ? 'step' : undefined}><span className="stage-icon"><Icon size={17} /></span><span className="stage-text"><b>{s.label}</b></span><span className="stage-status">{locked ? <LockKeyhole size={12} /> : s.number}</span></button>
+      })}</div><button className="new-case-button" disabled={busy || loading} onClick={restart}><RotateCcw size={15} /> New case</button><div className="sidebar-lower"><WorkspaceLinks compact /><div className="sidebar-heading">BEYOND THE BIKE</div><button data-tip="Same intelligence, new scale" className={`factory-link ${isFactory ? 'is-active' : ''}`} disabled={loading || !!pending} onClick={() => changeStage('factory')}><span className="factory-link-icon"><Factory size={19} /></span><span><b>Factory preview</b></span><ArrowRight size={15} /></button><div className="sidebar-foot"><span className="mini-pulse" /> HUMAN-REVIEWED WORKFLOW</div></div></nav>
       <main className="main-content" id="main-content" aria-busy={loading || busy}>
         <div className="main-topline"><span>WORKSPACE / {isFactory ? 'INDUSTRIAL PREVIEW' : current ? `CASE ${current.id.slice(0, 8)}` : 'NEW CASE'}</span><span>{isFactory ? 'PREVIEW MODE' : 'BICYCLE'}</span></div>
         {error && <div className="error-banner" role="alert"><Info size={18} /><span>{error}</span>{(!catalog || (caseId && !current)) && <button className="secondary-button" onClick={() => setReload(n => n + 1)}>Retry connection</button>}</div>}
@@ -364,11 +387,11 @@ export default function App() {
             {stage === 'verify' && current && investigation && <>
               <div className="verification-banner"><span><Crosshair size={18} /> GUIDED INSPECTION</span><p>Confirm each check. Findings and follow-up photos are optional.</p></div>
               <div className="inspection-preview verification-preview"><Frame src={current.image_url} annotations={scan?.annotations} fitted zoomable /></div>
-              <div className="verify-grid"><div className="panel verify-steps"><Label>INSPECTION STEPS</Label>{current.steps.map(step => <StepForm key={step.id} step={step} disabled={busy || !!verification} onObservationChange={observation => observationEdits.current.set(step.id, observation)} save={body => run('Saving verification evidence…', () => api.saveStep(current.id, step.id, body))} />)}</div><div className="panel confidence-panel"><Label>DIAGNOSIS CONFIDENCE</Label><div className="confidence-comparison"><div><span>BEFORE CHECK</span><strong>{investigation.hypotheses[0]?.confidence}<small>%</small></strong></div><ArrowRight size={23} /><div className={`confidence-after ${verification ? 'is-confirmed' : ''}`}><span>AFTER CHECK</span><strong>{verification?.confidence ?? '—'}<small>{verification ? '%' : ''}</small></strong></div></div><p>{verification?.summary || 'Confidence may increase, decrease, or remain unchanged after review.'}</p><p className="muted-copy">A confirmation records that you performed a check. Only supplied findings can establish its outcome.</p></div></div>
+              <div className="verify-grid"><StepsPanel steps={current.steps} disabled={busy || !!verification} onObservationChange={(step, observation) => observationEdits.current.set(step.id, observation)} save={(step, body) => run('Saving verification evidence…', () => api.saveStep(current.id, step.id, body))} /><div className="panel confidence-panel"><Label>DIAGNOSIS CONFIDENCE</Label><div className="confidence-comparison"><div><span>BEFORE CHECK</span><strong>{investigation.hypotheses[0]?.confidence}<small>%</small></strong></div><ArrowRight size={23} /><div className={`confidence-after ${verification ? 'is-confirmed' : ''}`}><span>AFTER CHECK</span><strong>{verification?.confidence ?? '—'}<small>{verification ? '%' : ''}</small></strong></div></div><p>{verification?.summary || 'Confidence may increase, decrease, or remain unchanged after review.'}</p><p className="muted-copy">A confirmation records that you performed a check. Only supplied findings can establish its outcome.</p></div></div>
               <div className="next-strip"><div><CircleCheck size={19} /><span>{verification ? `Review complete: ${verification.conclusion}.` : 'Confirm all checks, then reassess the diagnosis.'}</span></div>{verification ? <button className="primary-button" onClick={() => changeStage('act')}>Review action plan <ArrowRight size={17} /></button> : <button className="primary-button" disabled={busy || !current.steps.every(s => s.completed)} onPointerDown={event => event.preventDefault()} onClick={() => void reassessDiagnosis()}>Reassess diagnosis <ArrowRight size={17} /></button>}</div>
             </>}
             {stage === 'act' && current && verification && <>
-              <div className="diagnosis-hero"><div className="diagnosis-hero-top"><span><CircleCheck size={17} /> {verification.conclusion.toUpperCase()}</span><span className="sample-tag">AI RECOMMENDATION</span></div><div className="diagnosis-hero-main"><div><span className="section-kicker">PROBABLE CAUSE</span><h2>{verification.diagnosis}</h2><p>{verification.summary}</p></div><div className="diagnosis-score"><strong>{verification.confidence}<span>%</span></strong><small>ESTIMATED CONFIDENCE</small></div></div><div className="diagnosis-hero-bottom"><span>{verification.severity.toUpperCase()} SEVERITY</span><span>Human review required</span></div></div>
+              <div className="diagnosis-hero"><div className="diagnosis-hero-top"><span><CircleCheck size={17} /> {verification.conclusion.toUpperCase()}</span><span className="sample-tag">AI RECOMMENDATION</span></div><div className="diagnosis-hero-main"><div><span className="section-kicker">PROBABLE CAUSE</span><h2>{verification.diagnosis}</h2><p>{verification.summary}</p></div><div className="diagnosis-score" style={{ '--pct': verification.confidence } as React.CSSProperties}><strong>{verification.confidence}<span>%</span></strong><small>ESTIMATED CONFIDENCE</small></div></div><div className="diagnosis-hero-bottom"><span>{verification.severity.toUpperCase()} SEVERITY</span><span>Human review required</span></div></div>
               <div className="act-grid"><div className="panel recommendation-panel"><Label>RECOMMENDED ACTION</Label><div className="recommendation-main"><span className="action-icon"><Wrench size={20} /></span><h3>{verification.action}</h3></div><div className="recommendation-detail"><span>VERIFY THE FIX</span><p>{verification.verification}</p></div><div className="recommendation-detail"><span>EXPECTED RESULT</span><p>{verification.expected}</p></div></div><div className="panel approval-panel"><Label>HUMAN APPROVAL</Label><div className="approval-illustration"><ClipboardCheck size={35} /></div><h3>{task ? 'Service task recorded.' : selfResolved ? 'Marked as self-resolved.' : 'Review before approving.'}</h3><p>{task ? 'The task is on your maintenance board.' : selfResolved ? 'You reported that the issue is resolved.' : 'Approve the recommendation to create an internal service task.'}</p>{task ? <><span className="approval-confirmed"><CircleCheck size={17} /> Task approved</span><a className="text-button" href="/maintenance">View maintenance board <ArrowRight size={16} /></a></> : <><div className="approval-actions">
                 <button className="primary-button full-width" disabled={busy || selfResolved} onClick={() => void run('Creating service task…', () => api.approve(current.id))}>Approve & create task <ArrowRight size={17} /></button>
                 <button className="secondary-button full-width" disabled={busy || selfResolved} onClick={() => void run('Saving self-resolved case…', () => api.selfResolve(current.id))}>Skip, self-resolved</button>
@@ -380,7 +403,7 @@ export default function App() {
         </> : null}
         <footer className="page-footer"><span>MEKASCOPE / PROTOTYPE</span><span>{isFactory ? 'Prepared industrial preview' : 'AI-assisted inspection · Human-approved tasks'}</span></footer>
       </main>
-      <aside className="context-rail" aria-label="Equipment and agent context">{stage !== 'observe' && equipmentProfile}{stage !== 'observe' && agentNote}{stage !== 'observe' && contextAvailable}<button className="restart-button" disabled={busy || loading} onClick={restart}><RotateCcw size={15} /> New case</button></aside>
+      <aside className="context-rail" aria-label="Equipment and agent context">{stage !== 'observe' && equipmentProfile}{stage !== 'observe' && agentNote}{stage !== 'observe' && contextAvailable}</aside>
     </div>
   </div>
 }
